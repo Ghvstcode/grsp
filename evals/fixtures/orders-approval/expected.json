@@ -86,7 +86,7 @@
                         "approval\\.requested|emit_approval_requested|notify|Mailer"
                     ]
                 },
-                "€25,000": {
+                "/25,?000|10,?000\\.01|10,?001|[2-9]\\d,?\\d{3}/": {
                     "mustInclude": [
                         "ApprovalPolicy|orders/policies\\.py",
                         "approval\\.requested|emit_approval_requested|notify|Mailer"
@@ -103,7 +103,7 @@
             "question": "Can bulk imports skip approval?",
             "grounded": true,
             "mentions": [
-                "insert_many|bulk_create|BulkImportJob"
+                "insert_many|bulk_create|BulkImportJob|bulk import"
             ],
             "refsInclude": [
                 "jobs/bulk_import\\.py|orders/repository\\.py"
