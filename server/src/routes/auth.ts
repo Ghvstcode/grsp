@@ -71,7 +71,7 @@ auth.get("/auth/callback", async (c) => {
         }
 
         // Redirect to desktop app via deep link
-        const deepLinkScheme = c.env.APP_DEEP_LINK_SCHEME ?? "sustn";
+        const deepLinkScheme = c.env.APP_DEEP_LINK_SCHEME ?? "grsp";
         const deepLinkParams = new URLSearchParams({
             access_token: accessToken,
             github_id: String(githubUser.id),
@@ -91,7 +91,7 @@ auth.get("/auth/callback", async (c) => {
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>SUSTN — Authenticated</title>
+    <title>grsp — Authenticated</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -157,11 +157,11 @@ auth.get("/auth/callback", async (c) => {
 </head>
 <body>
     <div class="container">
-        <h1>Welcome to SUSTN!</h1>
+        <h1>Welcome to grsp</h1>
         <p>You've been authenticated successfully. Click below to return to the app.</p>
-        <a href="${deepLink}" class="btn" id="open-btn">Open SUSTN</a>
+        <a href="${deepLink}" class="btn" id="open-btn">Open grsp</a>
         <div class="fallback" id="fallback">
-            <p>If the app didn't open, copy this URL and paste it in the SUSTN app:</p>
+            <p>If the app didn't open, copy this URL and paste it in the grsp app:</p>
             <input type="text" value="${deepLink}" readonly onclick="this.select()" />
         </div>
     </div>

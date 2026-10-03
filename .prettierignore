@@ -3,5 +3,18 @@ src-tauri/target
 pnpm-lock.yaml
 .github
 web/.next
+web/out
 web/node_modules
+server/node_modules
+server/.wrangler
 dist
+# Eval fixtures are source trees for the agent to read; line numbers matter.
+evals/fixtures
+evals/.repos
+evals/reports
+# Design-tool export, kept byte-for-byte as the visual reference.
+design/prototype.html
+# Handed-over spec documents, kept as written.
+design/DESIGN.md
+design/PROMPT.md
+design/SPEC.md

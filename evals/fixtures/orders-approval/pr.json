@@ -1,0 +1,10 @@
+{
+    "title": "Require second approval for orders over €10k",
+    "author": "kemi.a",
+    "description": "## Context\n\nFinance asked for a four-eyes check on large orders after an incident where a high-value order was placed against the wrong customer account and charged before anyone noticed. This PR makes all orders over €10,000 wait for a second person with the finance approver role before they're confirmed and the card is charged.\n\n## Changes\n\n- New `ApprovalPolicy`: all orders over €10,000 are saved as `PENDING_APPROVAL` instead of `CONFIRMED`.\n- New `POST /orders/:id/approve`, restricted to `finance_approver`; creators can't approve their own orders.\n- Approvers get an email when an order needs them.\n- Payment capture still happens on `order.created`, which for large orders is now emitted after approval.\n- Migration 0042 makes room for the new status value and adds `approved_by` and `approved_at`.\n\n## Testing\n\nUnit tests for the policy boundaries (€9,999, €10,000, €10,000.01) and self-approval. Manually tested the approve flow on staging.\n",
+    "ask": [
+        "Can bulk imports skip approval?",
+        "Where is the €10k threshold defined?",
+        "How does this PR change the Kubernetes autoscaling configuration?"
+    ]
+}

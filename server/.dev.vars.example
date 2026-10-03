@@ -1,0 +1,7 @@
+# Copy to .dev.vars for `pnpm dev` (wrangler dev). Never commit .dev.vars.
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+# Must match VITE_AUTH_SERVER_URL in the desktop app's .env
+SERVER_URL=http://localhost:3001
+# The dev build of the desktop app registers grsp-dev:// (production uses grsp://)
+APP_DEEP_LINK_SCHEME=grsp-dev

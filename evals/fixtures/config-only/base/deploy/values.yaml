@@ -1,0 +1,27 @@
+image:
+  repository: registry.internal/shipments
+  tag: "2024.11.3"
+
+api:
+  replicas: 3
+  env:
+    DB_POOL_SIZE: "10"
+    REQUEST_TIMEOUT_SECONDS: "30"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+worker:
+  replicas: 2
+  env:
+    DB_POOL_SIZE: "5"
+    WORKER_CONCURRENCY: "4"
+    REQUEST_TIMEOUT_SECONDS: "30"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+postgres:
+  maxConnections: 100

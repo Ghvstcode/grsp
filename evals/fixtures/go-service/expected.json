@@ -1,0 +1,48 @@
+{
+    "description": "A Go service (SPEC §8): proves language independence. One HTTP entry point, an accurate description, and no other writer of the transfers table.",
+    "discovery": {
+        "summaryMentions": ["idempoten", "transfer"],
+        "entryPointsInclude": [
+            { "match": "POST /v1/transfers|createTransfer|internal/httpapi", "kind": "http" }
+        ],
+        "entryPointCount": { "min": 1, "max": 4 },
+        "mismatchCount": { "min": 0, "max": 0 },
+        "gapCount": { "min": 0, "max": 0 },
+        "allRefsVerified": true,
+        "maxUnverifiedRatio": 0.2
+    },
+    "questions": {
+        "count": { "min": 3, "max": 6 },
+        "allRefsVerified": true
+    },
+    "walkthrough": [
+        {
+            "entryPoint": "POST /v1/transfers|createTransfer|internal/httpapi",
+            "maxPathLength": 12,
+            "blocksInclude": [
+                "createTransfer|internal/httpapi/handlers\\.go",
+                "Service\\)?\\.Create|transfers\\.Create|internal/transfers/service\\.go",
+                "FindTransferByKey|InsertTransfer|internal/store/store\\.go"
+            ],
+            "blockStatus": [{ "match": "FindTransferByKey", "status": "new", "optional": true }]
+        }
+    ],
+    "ask": [
+        {
+            "question": "What happens when two requests with the same Idempotency-Key arrive at the same time?",
+            "grounded": true,
+            "mentions": ["unique|index|race|both|concurren"],
+            "refsInclude": ["internal/transfers/service\\.go|internal/store/store\\.go|migrations/0002"]
+        },
+        {
+            "question": "What status code does a replayed request get?",
+            "grounded": true,
+            "mentions": ["200"],
+            "refsInclude": ["internal/httpapi/handlers\\.go"]
+        }
+    ],
+    "review": {
+        "findingCount": { "min": 0, "max": 8 },
+        "allRefsVerified": true
+    }
+}

@@ -1,10 +1,28 @@
 # Claude's Onboarding Doc
 
-## What is SUSTN?
+## What is grsp?
 
-SUSTN (stylized as "sustn") is a native desktop app that acts as a background conductor for AI coding agents. It is built with Tauri v2, React, TypeScript, TanStack Query, Zustand, and a local SQLite database.
+grsp is a native macOS desktop app for _understanding_ pull requests instead of reading diffs. It is built with Tauri v2, React, TypeScript, TanStack Query, Zustand, and a local SQLite database.
 
-Users add their code repositories, and SUSTN scans each one using local Claude Code or Codex instances to generate a prioritized backlog of improvements. SUSTN monitors the user's remaining weekly subscription budget and uses leftover tokens to work through the backlog. All changes land as branches/PRs -- zero risk to the main codebase.
+Users add their repo folders and open a **review session** for a PR (paste a URL, pick an open PR, or choose two branches). grsp runs the user's own Claude Code or Codex against a read-only worktree of the PR head and shows three tabs:
+
+- **Gist** — "Author says" vs "Code does", mismatches, affected entry points, comprehension questions, the GitHub discussion, and an Ask panel.
+- **Walkthrough** — step through the changed behaviour block by block, with "what if" inputs.
+- **Review** — an AI review with editable findings that posts back to GitHub.
+
+`design/SPEC.md` is the source of truth for behaviour, `design/DESIGN.md` for the look.
+
+## The non-negotiable rule
+
+> **The agent discovers and interprets. git and the worktree confirm.**
+
+grsp is agent-first. The agent does all the code understanding; the Rust core does **no language parsing** (no tree-sitter, no framework detection). Change status, line numbers, code excerpts, comment threads and CI are never taken from agent output, and every `file:line` the agent returns goes through `src-tauri/src/verify` before it is shown. If you are about to render something the agent said about the code without verifying it, stop.
+
+Also:
+
+- **No API keys anywhere.** grsp shells out to the `claude` / `codex` CLI the user is already signed in to.
+- Never hard-code anything to a specific repo, language or framework (fixtures excepted).
+- Agent passes cost the user's subscription: cache by `headSha`, run lazily, never re-run on focus.
 
 ## Your role
 
@@ -15,21 +33,41 @@ If the user reports a bug in your code, after you fix it, pause and ask them to 
 ## Project Structure
 
 - **UI:** React components in `src/ui/components/`
-- **Core:** Business logic in `src/core/`
+- **Core:** Frontend logic in `src/core/`
 - **Tauri:** Rust backend in `src-tauri/src/`
-- **Landing page:** Next.js app in `web/` (separate from the desktop app)
+- **Landing page + docs:** Next.js app in `web/` (separate package)
+- **Auth server:** Cloudflare Worker in `server/` (separate package; GitHub sign-in and metrics only, never user code)
+- **Evals:** fixture repos and scorer in `evals/`
 
 Important directories:
 
-- `src/core/db/` - SQLite database query modules
-- `src/core/api/` - TanStack Query queries and mutations
-- `src/core/store/` - Zustand stores for client state
-- `src/ui/components/ui/` - shadcn/ui primitives (DO NOT edit manually)
+- `src/ui/components/session/` - The review session screens (PR header, Gist + Ask, Walkthrough, Review)
 - `src/ui/components/layout/` - App layout (shell, sidebar)
-- `src/ui/context/` - React contexts
-- `src/ui/providers/` - React providers
-- `src/ui/hooks/` - Custom hooks
-- `src/ui/themes/` - Theme definitions and provider
+- `src/ui/components/onboarding/` - Onboarding flow
+- `src/ui/components/settings/` - Settings sections
+- `src/ui/components/ui/` - shadcn/ui primitives (DO NOT edit manually)
+- `src/core/api/` - TanStack Query queries and mutations wrapping the Tauri commands
+- `src/core/db/` - SQLite query modules
+- `src/core/store/` - Zustand stores for client state
+- `src/core/fixtures/` - Fixture data (the prototype scenario) used outside Tauri and with `VITE_GRSP_FIXTURES=1`
+- `src/core/types/` - Shared types; `grsp.ts` is the Rust ↔ frontend contract
+- `src/core/services/client.ts` - `call(name, args)` (typed Tauri invoke with fixture fallback) and `onGrspEvent`
+
+Rust (`src-tauri/src/`):
+
+- `git/` - Resolve PRs to refs, fetch, read-only worktrees, the DiffMap (merge base, renames, exclusions)
+- `verify/` - The trust layer: CodeRef verification (anchor match, snap, drop), change status, edge spot-checks, excerpts, VerificationReports. Unit-test heavily.
+- `agent/` - One runner for Claude Code (`claude -p`, read-only tools) and Codex (`codex exec`, read-only sandbox): prompt layering, JSON parsing with one repair retry, progress lines, timeouts, cancellation
+- `pipelines/` - `discovery`, `questions`, `walkthrough`, `ask`, `discussion`, `review`. Every pipeline is: build prompt → run agent → parse → **verify** → persist
+- `github/` - Open PRs, PR metadata, CI, comments and review threads, posting reviews (via `gh`)
+- `commands.rs` - Tauri IPC command handlers
+- `model.rs` - Serde types returned to the frontend
+- `db.rs` - SQLite access from Rust
+- `migrations.rs` - SQLite schema (`grsp.db`)
+
+### The contract
+
+`src/core/types/grsp.ts` ↔ `src-tauri/src/model.rs`. These two files define every command, event and UI-ready shape, and must change together. Rust serialises with `rename_all = "camelCase"`.
 
 ## Coding Style
 
@@ -41,6 +79,8 @@ Important directories:
 - **Promise handling:** All promises must be handled (ESLint enforced with `no-floating-promises`).
 - **Nulls:** Prefer `undefined` over `null`. Convert `null` from SQLite to `undefined`.
 - **State management:** Zustand for client state, TanStack Query for async/server state, React Context for UI-only state (theme, layout).
+- **Visual language:** strict black and white with the tokens in `design/DESIGN.md`. Restyle shadcn components with those tokens rather than writing new ones.
+- **Rust:** every pipeline output passes through `verify` before it is persisted or returned. No language-specific parsing.
 
 ## Workflow
 
@@ -66,7 +106,7 @@ Commits must be detailed and well-structured. Use this format:
 
 **Types:** `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`, `ci`, `build`, `perf`
 
-**Scopes:** `ui`, `core`, `tauri`, `web`, `ci`, `config`, `deps`
+**Scopes:** `ui`, `core`, `tauri`, `web`, `server`, `evals`, `ci`, `config`, `deps`
 
 **Rules:**
 
@@ -79,15 +119,15 @@ Commits must be detailed and well-structured. Use this format:
 **Example:**
 
 ```
-feat(ui): add repository sidebar with drag-and-drop reordering
+feat(tauri): snap code refs to the anchor within ten lines
 
-Implement the repository list in the app sidebar. Users can now see
-all added repositories and reorder them via drag-and-drop.
+Agents often return a line number that is a few lines off. When the
+anchor is found within ±10 lines of startLine, move the ref there and
+count it as verified instead of dropping the claim.
 
-- Add RepositoryList component with DnD support
-- Add useRepositories hook for TanStack Query integration
-- Add reorder mutation to persist new order in SQLite
-- Wire sidebar to AppShell layout
+- Add snap search to verify::code_ref
+- Record snapped refs in the VerificationReport notes
+- Cover exact, snapped and dropped cases in unit tests
 
 closes #42
 ```
@@ -103,11 +143,16 @@ closes #42
 - React Router v6
 - SQLite via tauri-plugin-sql
 - ESLint 9 (flat config) + Prettier
+- Claude Code / Codex CLIs (the user's own, no API keys)
 
 ## Dev Commands
 
 - `pnpm tauri:dev` - Start dev environment (Vite + Tauri)
+- `VITE_GRSP_FIXTURES=1 pnpm tauri:dev` - Same, with every command served from fixtures (no agent, no GitHub)
 - `pnpm validate` - Run lint + format check + typecheck
+- `pnpm test` - Frontend tests (Vitest)
+- `cargo test --manifest-path src-tauri/Cargo.toml` - Rust unit and contract tests
+- `pnpm eval` - Run the real pipelines against the fixture repos in `evals/` (uses your subscription; local only, never CI)
 - `pnpm lint:fix` - Auto-fix lint issues
 - `pnpm format` - Auto-format with Prettier
 

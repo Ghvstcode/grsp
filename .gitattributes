@@ -1,2 +1,5 @@
 # Normalize line endings
 * text=auto
+
+# Eval fixtures are sample repositories, not grsp source
+evals/fixtures/** linguist-vendored

@@ -1,37 +1,12 @@
 import type { Metadata } from "next";
+import { GITHUB_URL, GitHubIcon, Logo } from "../components/logo";
 import { changelog, type ChangelogEntry } from "./data";
 
 export const metadata: Metadata = {
-    title: "Changelog — sustn",
+    title: "Changelog — grsp",
     description:
-        "What's new in sustn. Release notes, features, improvements, and fixes.",
+        "What's new in grsp. Release notes, features, improvements, and fixes.",
 };
-
-function Logo({
-    size = 20,
-    className = "",
-}: {
-    size?: number;
-    className?: string;
-}) {
-    return (
-        <svg
-            width={size}
-            height={size}
-            viewBox="0 0 42 42"
-            fill="none"
-            className={className}
-        >
-            <path
-                d="M24.3012 1.73511V19.0934M24.3012 36.4518V19.0934M36.5754 6.81925L12.027 31.3676M24.3012 19.0934L6.94287 19.0934M36.5754 31.3676L12.027 6.81925"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
 
 function EntrySection({
     heading,
@@ -134,7 +109,7 @@ export default function ChangelogPage() {
                     <a href="/" className="flex items-center gap-2">
                         <Logo size={16} className="animate-slow-spin" />
                         <span className="font-semibold tracking-tight">
-                            sustn
+                            grsp
                         </span>
                     </a>
                     <div className="flex items-center gap-6">
@@ -151,23 +126,16 @@ export default function ChangelogPage() {
                             Docs
                         </a>
                         <a
-                            href="https://github.com/Ghvstcode/sustn"
+                            href={GITHUB_URL}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-gray-400 hover:text-black transition-colors hidden sm:block"
                             aria-label="GitHub"
                         >
-                            <svg
-                                width="18"
-                                height="18"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                            >
-                                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                            </svg>
+                            <GitHubIcon />
                         </a>
                         <a
-                            href="#download"
+                            href="/#download"
                             className="text-sm bg-black text-white font-medium px-3.5 py-1.5 rounded-lg hover:bg-gray-800 transition-colors mono"
                         >
                             Download
@@ -207,7 +175,7 @@ export default function ChangelogPage() {
                 <div className="max-w-3xl mx-auto flex justify-between items-center">
                     <div className="flex items-center gap-2 text-gray-500 font-medium">
                         <Logo size={12} className="animate-slow-spin" />©{" "}
-                        {new Date().getFullYear()} sustn
+                        {new Date().getFullYear()} grsp
                     </div>
                     <div className="flex gap-8 text-gray-500">
                         <a
@@ -223,12 +191,12 @@ export default function ChangelogPage() {
                             Docs
                         </a>
                         <a
-                            href="https://x.com/sustnapp"
+                            href={GITHUB_URL}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:text-black transition-colors font-medium"
                         >
-                            Follow us on X
+                            GitHub
                         </a>
                     </div>
                 </div>

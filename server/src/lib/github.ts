@@ -58,7 +58,7 @@ export async function fetchGitHubUser(
         headers: {
             Authorization: `Bearer ${accessToken}`,
             Accept: "application/vnd.github+json",
-            "User-Agent": "sustn-server",
+            "User-Agent": "grsp-server",
         },
     });
 
@@ -76,7 +76,7 @@ export async function fetchGitHubUser(
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                     Accept: "application/vnd.github+json",
-                    "User-Agent": "sustn-server",
+                    "User-Agent": "grsp-server",
                 },
             },
         );

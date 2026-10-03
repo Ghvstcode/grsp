@@ -1,0 +1,28 @@
+{
+    "description": "A config-only PR (SPEC §8): YAML and SQL, no application code. Expect a sensible gist and no invented code paths: nothing the agent points at may fail verification, and it must not manufacture mismatches or gaps.",
+    "discovery": {
+        "summaryMentions": ["index", "worker|replica|concurrency", "timeout|10 ?s"],
+        "entryPointCount": { "min": 0, "max": 4 },
+        "mismatchCount": { "min": 0, "max": 0 },
+        "gapCount": { "min": 0, "max": 0 },
+        "allRefsVerified": true,
+        "maxDropped": 1,
+        "maxUnverifiedRatio": 0.2
+    },
+    "questions": {
+        "count": { "min": 0, "max": 6 },
+        "allRefsVerified": true
+    },
+    "ask": [
+        {
+            "question": "Could the worker run out of database connections after this change?",
+            "grounded": true,
+            "mentions": ["pool|DB_POOL_SIZE|connection"],
+            "refsInclude": ["deploy/values\\.yaml|app/db\\.py|app/settings\\.py|app/worker\\.py"]
+        }
+    ],
+    "review": {
+        "findingCount": { "min": 0, "max": 6 },
+        "allRefsVerified": true
+    }
+}

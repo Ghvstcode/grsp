@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 
-const REPO = "https://github.com/Ghvstcode/sustn";
+const REPO = "https://github.com/ghvstcode/grsp";
 const DOWNLOAD_BASE = `${REPO}/releases/latest/download`;
 
 function AppleIcon() {
@@ -102,7 +102,7 @@ export function DownloadDropdown({
                     <div className="w-64 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden animate-dropdown">
                         <div className="p-1.5">
                             <a
-                                href={`${DOWNLOAD_BASE}/SUSTN_aarch64.dmg`}
+                                href={`${DOWNLOAD_BASE}/grsp_aarch64.dmg`}
                                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 group"
                                 onClick={() => setOpen(false)}
                             >
@@ -119,7 +119,7 @@ export function DownloadDropdown({
                                 </div>
                             </a>
                             <a
-                                href={`${DOWNLOAD_BASE}/SUSTN_x64.dmg`}
+                                href={`${DOWNLOAD_BASE}/grsp_x64.dmg`}
                                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 group"
                                 onClick={() => setOpen(false)}
                             >

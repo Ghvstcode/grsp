@@ -4,7 +4,7 @@
 
 body {
     font-family:
-        var(--font-inter),
+        var(--font-sans),
         system-ui,
         -apple-system,
         BlinkMacSystemFont,
@@ -23,8 +23,8 @@ body {
 
 .mono {
     font-family:
-        var(--font-mono), "SF Mono", Monaco, "Cascadia Code", "Roboto Mono",
-        Consolas, "Courier New", monospace;
+        var(--font-mono), ui-monospace, "SF Mono", Menlo, Monaco, Consolas,
+        "Courier New", monospace;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
 }

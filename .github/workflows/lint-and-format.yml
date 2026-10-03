@@ -1,4 +1,4 @@
-name: Lint and Format
+name: Lint, Format and Test
 
 on:
     push:
@@ -9,9 +9,13 @@ on:
 permissions:
     contents: read
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     lint-and-format:
-        name: Lint, Format, and Typecheck
+        name: Lint, Format, Typecheck and Frontend Tests
         runs-on: ubuntu-latest
 
         steps:
@@ -40,3 +44,33 @@ jobs:
 
             - name: Run TypeScript check
               run: pnpm typecheck
+
+            - name: Run frontend tests
+              run: pnpm test
+
+            # Deterministic tests for the eval scorer and fixture builder.
+            # The evals themselves need a signed-in agent and are never run in CI.
+            - name: Run eval scorer tests
+              run: pnpm eval:test
+
+    rust-tests:
+        name: Rust Tests (git, verify, pipelines contract tests)
+        runs-on: macos-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install stable Rust toolchain
+              uses: actions-rust-lang/setup-rust-toolchain@v1
+              with:
+                  toolchain: stable
+                  cache: true
+                  cache-workspaces: src-tauri
+
+            # tauri::generate_context! needs the frontendDist directory to exist.
+            - name: Create empty frontend dist
+              run: mkdir -p dist
+
+            - name: Run cargo test
+              run: cargo test --manifest-path src-tauri/Cargo.toml

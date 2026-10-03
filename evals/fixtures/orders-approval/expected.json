@@ -1,0 +1,140 @@
+{
+    "description": "The prototype scenario (SPEC §8). The description claims all orders over €10k need approval; the nightly BulkImportJob bulk_creates orders as CONFIRMED without the policy and is untouched by the PR.",
+    "discovery": {
+        "summaryMentions": [
+            "10[,.]?000|10k",
+            "approv"
+        ],
+        "entryPointsInclude": [
+            {
+                "match": "POST /orders/?$|create_order|^api/views/orders\\.py$",
+                "kind": "http"
+            },
+            {
+                "match": "orders/.+/approve|approve_order|api/views/approvals\\.py",
+                "kind": "http"
+            }
+        ],
+        "entryPointCount": {
+            "min": 2,
+            "max": 12
+        },
+        "gapMentions": [
+            "BulkImportJob|bulk_import|bulk_create|insert_many"
+        ],
+        "gapCount": {
+            "min": 1,
+            "max": 2
+        },
+        "mismatchCount": {
+            "min": 1,
+            "max": 1
+        },
+        "mismatchMentions": [
+            "bulk|import"
+        ],
+        "allRefsVerified": true,
+        "maxUnverifiedRatio": 0.2,
+        "affectedInclude": [
+            {
+                "match": "BulkImportJob|bulk_import|insert_many",
+                "tag": "not_covered"
+            }
+        ]
+    },
+    "questions": {
+        "count": {
+            "min": 3,
+            "max": 6
+        },
+        "allRefsVerified": true
+    },
+    "walkthrough": [
+        {
+            "entryPoint": "POST /orders/?$|create_order|^api/views/orders\\.py$",
+            "maxPathLength": 12,
+            "blocksInclude": [
+                "OrderService|orders/services\\.py",
+                "ApprovalPolicy|orders/policies\\.py"
+            ],
+            "blockStatus": [
+                {
+                    "match": "ApprovalPolicy|orders/policies\\.py",
+                    "status": "new"
+                },
+                {
+                    "match": "OrderService\\.create|orders/services\\.py",
+                    "status": "changed"
+                }
+            ],
+            "whatIf": {
+                "€9,999": {
+                    "mustInclude": [
+                        "ApprovalPolicy|orders/policies\\.py",
+                        "order\\.created|emit_order_created|PaymentService|capture"
+                    ],
+                    "mustNotInclude": [
+                        "approval\\.requested|emit_approval_requested|notify|Mailer"
+                    ]
+                },
+                "€10,000": {
+                    "optional": true,
+                    "mustInclude": [
+                        "ApprovalPolicy|orders/policies\\.py"
+                    ],
+                    "mustNotInclude": [
+                        "approval\\.requested|emit_approval_requested|notify|Mailer"
+                    ]
+                },
+                "€25,000": {
+                    "mustInclude": [
+                        "ApprovalPolicy|orders/policies\\.py",
+                        "approval\\.requested|emit_approval_requested|notify|Mailer"
+                    ],
+                    "mustNotInclude": [
+                        "PaymentService|capture"
+                    ]
+                }
+            }
+        }
+    ],
+    "ask": [
+        {
+            "question": "Can bulk imports skip approval?",
+            "grounded": true,
+            "mentions": [
+                "insert_many|bulk_create|BulkImportJob"
+            ],
+            "refsInclude": [
+                "jobs/bulk_import\\.py|orders/repository\\.py"
+            ]
+        },
+        {
+            "question": "Where is the €10k threshold defined?",
+            "grounded": true,
+            "refsInclude": [
+                "orders/policies\\.py"
+            ]
+        },
+        {
+            "question": "How does this PR change the Kubernetes autoscaling configuration?",
+            "grounded": false
+        }
+    ],
+    "review": {
+        "findingsInclude": [
+            {
+                "match": "bulk|import",
+                "severity": [
+                    "blocking"
+                ],
+                "file": "jobs/bulk_import\\.py|orders/repository\\.py"
+            }
+        ],
+        "findingCount": {
+            "min": 1,
+            "max": 8
+        },
+        "allRefsVerified": true
+    }
+}

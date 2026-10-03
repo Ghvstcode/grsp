@@ -9,6 +9,8 @@ on:
             - "server/**"
             - "web/**"
             - "docs/**"
+            - "evals/**"
+            - "design/**"
             - "*.md"
 
 concurrency:
@@ -53,6 +55,9 @@ jobs:
 
             - name: Run ESLint
               run: pnpm lint
+
+            - name: Run tests
+              run: pnpm test
 
             - name: Build Tauri binaries for ${{ matrix.architecture }}
               run: |

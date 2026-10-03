@@ -49,6 +49,9 @@ jobs:
             - name: Run ESLint
               run: pnpm lint
 
+            - name: Run tests
+              run: pnpm test
+
             - name: Build Tauri binaries for ${{ matrix.architecture }}
               run: |
                   rustup target add ${{ matrix.architecture }}
@@ -106,9 +109,9 @@ jobs:
 
                     # Rename DMGs to stable names without version number
                     if [ "$arch" = "aarch64-apple-darwin" ]; then
-                      mv "$dmg_dir"/*.dmg "$dmg_dir/SUSTN_aarch64.dmg"
+                      mv "$dmg_dir"/*.dmg "$dmg_dir/grsp_aarch64.dmg"
                     elif [ "$arch" = "x86_64-apple-darwin" ]; then
-                      mv "$dmg_dir"/*.dmg "$dmg_dir/SUSTN_x64.dmg"
+                      mv "$dmg_dir"/*.dmg "$dmg_dir/grsp_x64.dmg"
                     fi
                   done
 

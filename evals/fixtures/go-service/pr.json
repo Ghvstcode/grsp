@@ -1,0 +1,9 @@
+{
+    "title": "Honour Idempotency-Key on transfer creation",
+    "author": "tunde.o",
+    "description": "Clients retry `POST /v1/transfers` on timeouts, and a retry that lands after the first request succeeded moves the money twice.\n\nWith this change a request that carries an `Idempotency-Key` header returns the transfer created earlier with the same key instead of creating a second one (200 instead of 201). Keys are scoped to the source account. Requests without the header behave exactly as before.\n\nMigration 0002 adds the nullable `idempotency_key` column and a partial unique index on `(from_account, idempotency_key)`.\n",
+    "ask": [
+        "What happens when two requests with the same Idempotency-Key arrive at the same time?",
+        "What status code does a replayed request get?"
+    ]
+}

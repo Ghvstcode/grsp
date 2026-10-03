@@ -17,7 +17,7 @@ The page is statically exported at build time (`output: "export"` in next.config
 
 ## Adding a new release
 
-1. **Drop images** into `public/changelog/`. Use the naming convention `{version}-{slug}.png` (e.g. `0.3.0-dashboard.png`).
+1. **Drop images** (optional) into `public/changelog/`. Use the naming convention `{version}-{slug}.png` (e.g. `0.3.0-walkthrough.png`). Screenshots should show the real app in the grsp black-and-white design; don't commit screenshots with private code in them.
 
 2. **Add an entry** at the **top** of the `changelog` array in `app/changelog/data.ts`:
 
@@ -28,7 +28,7 @@ The page is statically exported at build time (`output: "export"` in next.config
     title: "Short headline for this release",
     description: "One or two sentences summarizing the release.",
     image: {
-        src: "/changelog/0.3.0-dashboard.png",
+        src: "/changelog/0.3.0-walkthrough.png",
         alt: "Description of the screenshot",
     },
     features: [
@@ -45,6 +45,8 @@ The page is statically exported at build time (`output: "export"` in next.config
 ```
 
 3. **Build** to verify: `pnpm build`
+
+Write entries about what the reviewer can now do, not about internals. Keep the newest release first; the first entry in the array is the one people read.
 
 ## Entry fields
 

@@ -1,0 +1,9 @@
+{
+    "title": "Enforce the plan's seat limit when inviting members",
+    "author": "ines.r",
+    "description": "Teams on the free plan could invite as many people as they liked. This adds a server-side check to invite creation.\n\n- `InviteService.create` now rejects the invite with `409 seat_limit_reached` when members plus pending invites have reached the plan's seat limit (free 3, team 25, business 250).\n- New `seatUsage(teamId)` helper and `SEAT_LIMITS` per plan.\n\nServer only. The web app doesn't have copy for the new error code yet; that's tracked in #212.\n",
+    "ask": [
+        "What does the user see when they invite someone and the team is full?",
+        "Do pending invites count towards the seat limit?"
+    ]
+}

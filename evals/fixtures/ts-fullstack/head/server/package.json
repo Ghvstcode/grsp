@@ -1,0 +1,6 @@
+{
+    "name": "@teamspace/server",
+    "private": true,
+    "scripts": { "dev": "tsx watch src/app.ts" },
+    "dependencies": { "express": "^4.19.2", "pg": "^8.11.5" }
+}

@@ -1,17 +1,19 @@
-name = "sustn-server"
+name = "grsp-server"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 [vars]
-APP_DEEP_LINK_SCHEME = "sustn"
+APP_DEEP_LINK_SCHEME = "grsp"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "sustn-db"
-database_id = "240dbcff-753a-4788-b443-87871b838c67"
+database_name = "grsp-db"
+database_id = "00000000-0000-0000-0000-000000000000" # replace with the id printed by `wrangler d1 create grsp-db`
 migrations_dir = "migrations"
 
 [observability]
 [observability.logs]
 enabled = true
 invocation_logs = true
+[dev]
+port = 3001

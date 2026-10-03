@@ -1,6 +1,6 @@
 # Releasing
 
-How to cut a new SUSTN release and how the CI pipelines ship builds.
+How to cut a new grsp release and how the CI pipelines ship builds.
 
 ## Cutting a release
 
@@ -16,7 +16,7 @@ When you're ready to ship a version, the flow is:
 1. Builds two macOS binaries in parallel — one for Apple Silicon (`aarch64-apple-darwin`), one for Intel (`x86_64-apple-darwin`).
 2. Each build is code-signed with the Apple Developer cert and notarized with Apple so Gatekeeper doesn't block it.
 3. A `publish` job then creates a GitHub Release containing:
-    - The two `.dmg` files (what users download).
+    - The two `.dmg` files, renamed to the stable names `grsp_aarch64.dmg` and `grsp_x64.dmg` (what the Download button on grsp.app links to).
     - `.app.tar.gz` + `.sig` files (what the Tauri updater consumes).
     - A `latest.json` manifest that tells the updater "here's the newest version and where to download it".
 
@@ -30,7 +30,15 @@ The release workflow relies on these repo secrets:
 
 ## Nightly QA builds
 
-Every push to `main` triggers [`qa-build.yaml`](../.github/workflows/qa-build.yaml), which builds both architectures using `tauri.qa.conf.json` and publishes them as a `nightly` pre-release on GitHub. Path filters skip the build when only `server/**`, `web/**`, `docs/**`, or top-level markdown changes. The `nightly` tag is overwritten each run, so testers can always grab the freshest `main` without waiting on a formal release.
+Every push to `main` triggers [`qa-build.yaml`](../.github/workflows/qa-build.yaml), which builds both architectures using `tauri.qa.conf.json` and publishes them as a `nightly` pre-release on GitHub. Path filters skip the build when only `server/**`, `web/**`, `docs/**`, `evals/**`, `design/**`, or top-level markdown changes. The `nightly` tag is overwritten each run, so testers can always grab the freshest `main` without waiting on a formal release.
+
+## CI on pull requests
+
+[`lint-and-format.yml`](../.github/workflows/lint-and-format.yml) runs on every pull request and push to `main`: Prettier check, ESLint, `tsc`, `pnpm test`, the eval scorer's own unit tests, and `cargo test` (the verification layer and the pipeline contract tests). The agent evals (`pnpm eval`) are **not** run in CI: they need a signed-in Claude Code or Codex and spend subscription usage. Run them locally before a release if any prompt changed.
+
+## Server deploys
+
+Pushes to `main` that touch `server/**` trigger [`deploy-server.yaml`](../.github/workflows/deploy-server.yaml), which typechecks the worker, applies D1 migrations to `grsp-db` and runs `wrangler deploy`. It needs the `CLOUDFLARE_API_TOKEN` secret, and `database_id` in `server/wrangler.toml` must be set to the real D1 database first.
 
 ## Bump scripts
 
@@ -44,8 +52,9 @@ See [`web/CHANGELOG-GUIDE.md`](../web/CHANGELOG-GUIDE.md). Add the new entry to 
 
 - [ ] All work for the release is merged to `main`.
 - [ ] Nightly QA build passed on the latest `main`.
+- [ ] `pnpm eval` run locally if prompts or pipelines changed since the last release.
 - [ ] Changelog entry added to [`web/app/changelog/data.ts`](../web/app/changelog/data.ts).
-- [ ] Screenshot placed in [`web/public/changelog/`](../web/public/changelog/) using the `{version}-{slug}.png` convention.
+- [ ] Screenshot, if any, placed in [`web/public/changelog/`](../web/public/changelog/) using the `{version}-{slug}.png` convention.
 - [ ] `pnpm bump:minor` (or `:patch`) committed and pushed.
 - [ ] `v<version>` tag pushed.
 - [ ] GitHub Release created by CI looks right (both DMGs, both `.app.tar.gz` + `.sig`, `latest.json` present).

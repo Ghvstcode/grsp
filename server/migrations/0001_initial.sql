@@ -1,4 +1,4 @@
--- Initial schema for SUSTN server (D1/SQLite)
+-- Initial schema for grsp server (D1/SQLite)
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

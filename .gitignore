@@ -53,3 +53,7 @@ server/.dev.vars
 server/.wrangler
 
 .claude
+
+# Evals (fixture repos are materialised on demand; reports are local)
+evals/.repos
+evals/reports

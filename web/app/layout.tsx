@@ -1,22 +1,38 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
-const inter = Inter({
+const geist = Geist({
     subsets: ["latin"],
-    variable: "--font-inter",
+    variable: "--font-sans",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const geistMono = Geist_Mono({
     subsets: ["latin"],
     variable: "--font-mono",
 });
 
+const title = "grsp — Stop reading diffs. Understand the change.";
+const description =
+    "A macOS app for understanding pull requests. See what a PR actually does, step through the changed behaviour, and review with confidence — on the Claude Code or Codex subscription you already have.";
+
 export const metadata: Metadata = {
-    title: "sustn — Stop prompting. Start approving.",
-    description:
-        "Background conductor for AI coding agents. Continuously improve your codebase using leftover AI subscription budget. All changes land as branches and PRs — zero risk.",
+    metadataBase: new URL("https://grsp.app"),
+    title,
+    description,
+    openGraph: {
+        title,
+        description,
+        url: "https://grsp.app",
+        siteName: "grsp",
+        type: "website",
+    },
+    twitter: {
+        card: "summary",
+        title,
+        description,
+    },
 };
 
 export default function RootLayout({
@@ -25,10 +41,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html
-            lang="en"
-            className={`${inter.variable} ${jetbrainsMono.variable}`}
-        >
+        <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
             <body className="font-sans antialiased">
                 {children}
                 <Analytics />

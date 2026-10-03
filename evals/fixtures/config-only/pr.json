@@ -1,0 +1,6 @@
+{
+    "title": "Scale the worker and index shipments by status",
+    "author": "sade.m",
+    "description": "Carrier polling has been falling behind since the holiday volume started.\n\n- Worker: 2 → 4 replicas, concurrency 4 → 8 per replica, and the carrier request timeout drops from 30s to 10s so one slow carrier can't hold a slot for half a minute.\n- New index on `shipments (status, created_at desc)`, created concurrently, for the status queries.\n\nNo application code changes.\n",
+    "ask": ["Could the worker run out of database connections after this change?"]
+}

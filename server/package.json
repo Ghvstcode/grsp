@@ -1,13 +1,14 @@
 {
-    "name": "sustn-server",
+    "name": "grsp-server",
     "version": "0.1.0",
     "private": true,
     "type": "module",
     "scripts": {
         "dev": "wrangler dev",
         "deploy": "wrangler deploy",
-        "db:migrate:local": "wrangler d1 migrations apply sustn-db --local",
-        "db:migrate:prod": "wrangler d1 migrations apply sustn-db --remote"
+        "typecheck": "tsc --noEmit",
+        "db:migrate:local": "wrangler d1 migrations apply grsp-db --local",
+        "db:migrate:prod": "wrangler d1 migrations apply grsp-db --remote"
     },
     "dependencies": {
         "drizzle-orm": "^0.38.0",

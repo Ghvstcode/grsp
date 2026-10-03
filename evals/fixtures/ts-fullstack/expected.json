@@ -1,0 +1,48 @@
+{
+    "description": "A TypeScript full-stack repo (SPEC §8). The PR only touches the server, but the Invite member button in the web app calls the changed endpoint, so the UI action must show up as an affected entry point.",
+    "discovery": {
+        "summaryMentions": ["seat", "invit"],
+        "entryPointsInclude": [
+            { "match": "InviteMemberButton|Invite member|TeamSettings|handleInvite", "kind": "ui" }
+        ],
+        "entryPointCount": { "min": 1, "max": 6 },
+        "mismatchCount": { "min": 0, "max": 0 },
+        "gapCount": { "min": 0, "max": 0 },
+        "allRefsVerified": true,
+        "maxUnverifiedRatio": 0.2
+    },
+    "questions": {
+        "count": { "min": 3, "max": 6 },
+        "allRefsVerified": true
+    },
+    "walkthrough": [
+        {
+            "entryPoint": "InviteMemberButton|Invite member|TeamSettings|handleInvite",
+            "maxPathLength": 12,
+            "blocksInclude": [
+                "InviteMemberButton|handleInvite|inviteMember|web/src",
+                "InviteService|server/src/services/invites\\.ts",
+                "seatUsage|SeatLimit|server/src/services/seats\\.ts"
+            ],
+            "blockStatus": [{ "match": "InviteMemberButton|handleInvite", "status": "unchanged" }]
+        }
+    ],
+    "ask": [
+        {
+            "question": "What does the user see when they invite someone and the team is full?",
+            "grounded": true,
+            "mentions": ["Something went wrong|generic|seat_limit_reached"],
+            "refsInclude": ["web/src/components/InviteMemberButton\\.tsx|server/src/errors\\.ts|server/src/services/invites\\.ts"]
+        },
+        {
+            "question": "Do pending invites count towards the seat limit?",
+            "grounded": true,
+            "mentions": ["pending"],
+            "refsInclude": ["server/src/services/seats\\.ts|server/src/db\\.ts"]
+        }
+    ],
+    "review": {
+        "findingCount": { "min": 0, "max": 8 },
+        "allRefsVerified": true
+    }
+}
