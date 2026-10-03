@@ -16,11 +16,9 @@ import { OnboardingFlow } from "@ui/components/onboarding/OnboardingFlow";
 import { Toaster } from "sonner";
 import { useTheme } from "@ui/hooks/useTheme";
 import { useOnboardingStatus } from "@core/api/useOnboarding";
-import { clearBadge } from "@core/services/notifications";
-import { useEnvironmentIssueListener } from "@core/api/useEngine";
 import { useUpdateChecker } from "@core/api/useUpdater";
+import { onMenuNavigate } from "@core/services/platform";
 import { UpdateDialog } from "@ui/components/UpdateDialog";
-import { listen } from "@tauri-apps/api/event";
 import {
     QueryClient,
     QueryClientProvider,
@@ -42,6 +40,9 @@ const queryClient = new QueryClient({
             networkMode: "always",
             refetchOnWindowFocus: false,
             staleTime: Infinity,
+        },
+        mutations: {
+            networkMode: "always",
         },
     },
 });
@@ -67,28 +68,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 function AppContent() {
     const { mode } = useTheme();
     const navigate = useNavigate();
-    useEnvironmentIssueListener();
     const { updateVersion, showUpdateDialog, handleInstall, handleDismiss } =
         useUpdateChecker();
 
     // Handle menu bar navigation events from Tauri
-    useEffect(() => {
-        const unlisten = listen<string>("menu-navigate", (event) => {
-            navigate(event.payload);
-        });
-        return () => {
-            void unlisten.then((fn) => fn());
-        };
-    }, [navigate]);
-
-    // Clear dock badge when the window gets focus
-    useEffect(() => {
-        function handleFocus() {
-            void clearBadge();
-        }
-        window.addEventListener("focus", handleFocus);
-        return () => window.removeEventListener("focus", handleFocus);
-    }, []);
+    useEffect(() => onMenuNavigate((path) => navigate(path)), [navigate]);
 
     const resolvedTheme =
         mode === "system"
@@ -124,6 +108,7 @@ function AppContent() {
                         </AuthGuard>
                     }
                 />
+                <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             <UpdateDialog
                 open={showUpdateDialog}
@@ -144,13 +129,15 @@ function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <Router>
-                <ThemeProvider storageKey="sustn-theme">
+                <ThemeProvider storageKey="grsp-theme">
                     <AppProvider>
                         <AppContent />
                     </AppProvider>
                 </ThemeProvider>
             </Router>
-            <ReactQueryDevtools initialIsOpen={false} />
+            {import.meta.env.DEV && (
+                <ReactQueryDevtools initialIsOpen={false} />
+            )}
         </QueryClientProvider>
     );
 }

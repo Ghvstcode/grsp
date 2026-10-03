@@ -12,6 +12,21 @@ module.exports = {
         },
         extend: {
             colors: {
+                // grsp DESIGN tokens (design/DESIGN.md)
+                ink: "hsl(var(--ink))",
+                paper: "hsl(var(--paper))",
+                panel: "hsl(var(--panel))",
+                wash: "hsl(var(--wash))",
+                line: {
+                    DEFAULT: "hsl(var(--line))",
+                    soft: "hsl(var(--line-soft))",
+                    strong: "hsl(var(--line-strong))",
+                },
+                "text-2": "hsl(var(--text-2))",
+                "text-3": "hsl(var(--text-3))",
+                "code-add": "hsl(var(--code-add))",
+                "code-hl": "hsl(var(--code-hl))",
+                // shadcn tokens
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
                 ring: "hsl(var(--ring))",
@@ -59,6 +74,9 @@ module.exports = {
                 },
             },
             borderRadius: {
+                // DESIGN radii: 8px controls (md), 10px (lg) and 12px (xl)
+                // cards, 999px pills (full).
+                xl: "calc(var(--radius) + 2px)",
                 lg: "var(--radius)",
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",

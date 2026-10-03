@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { check, Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { isTauri } from "@core/services/client";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -26,6 +27,9 @@ export function useUpdateChecker() {
                 console.debug("Update check failed:", e);
             }
         }
+
+        // The updater plugin only exists inside the Tauri webview.
+        if (!isTauri) return;
 
         if (!checkedRef.current) {
             checkedRef.current = true;

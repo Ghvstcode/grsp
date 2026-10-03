@@ -1,39 +1,33 @@
 import { Button } from "@ui/components/ui/button";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowRight, BookOpen, MessageCircle } from "lucide-react";
+import { LogoMark } from "@ui/components/LogoMark";
+import { config } from "@core/config";
+import { openExternal } from "@core/services/platform";
 
 interface CompleteStepProps {
     onComplete: () => void;
     isPending: boolean;
+    /** True when a review was opened during onboarding. */
+    hasReview: boolean;
 }
 
-export function CompleteStep({ onComplete, isPending }: CompleteStepProps) {
+export function CompleteStep({
+    onComplete,
+    isPending,
+    hasReview,
+}: CompleteStepProps) {
     return (
         <div className="flex flex-col items-center text-center">
             {/* Logo with pop-in animation */}
             <div className="animate-pop-in">
-                <svg
-                    width="48"
-                    height="48"
-                    viewBox="0 0 42 42"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        d="M24.3012 1.73511V19.0934M24.3012 36.4518V19.0934M36.5754 6.81925L12.027 31.3676M24.3012 19.0934L6.94287 19.0934M36.5754 31.3676L12.027 6.81925"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                </svg>
+                <LogoMark size={48} />
             </div>
 
             <h2 className="text-2xl font-bold tracking-tight text-foreground mt-6 animate-fade-in-up delay-200">
                 You're all set
             </h2>
             <p className="text-muted-foreground font-mono text-sm tracking-widest uppercase mt-2 animate-fade-in-up delay-300">
-                Ready for launch.
+                {hasReview ? "Your first review is ready." : "Ready to review."}
             </p>
 
             {/* CTA */}
@@ -44,7 +38,11 @@ export function CompleteStep({ onComplete, isPending }: CompleteStepProps) {
                     onClick={onComplete}
                     disabled={isPending}
                 >
-                    {isPending ? "Setting up..." : "Get started"}
+                    {isPending
+                        ? "Setting up..."
+                        : hasReview
+                          ? "Open the review"
+                          : "Get started"}
                     {!isPending && <ArrowRight className="h-4 w-4" />}
                 </Button>
             </div>
@@ -54,7 +52,7 @@ export function CompleteStep({ onComplete, isPending }: CompleteStepProps) {
                 <button
                     type="button"
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => void openUrl("https://docs.sustn.app")}
+                    onClick={() => void openExternal(config.docsUrl)}
                 >
                     <BookOpen className="h-3 w-3" />
                     Docs
@@ -63,10 +61,10 @@ export function CompleteStep({ onComplete, isPending }: CompleteStepProps) {
                 <button
                     type="button"
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => void openUrl("https://discord.gg/sustn")}
+                    onClick={() => void openExternal(config.issuesUrl)}
                 >
                     <MessageCircle className="h-3 w-3" />
-                    Community
+                    Report an issue
                 </button>
             </div>
         </div>

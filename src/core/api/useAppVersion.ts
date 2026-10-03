@@ -1,9 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { getVersion } from "@tauri-apps/api/app";
+import { isTauri } from "@core/services/client";
 
 export function useAppVersion() {
     return useQuery({
         queryKey: ["app-version"],
-        queryFn: () => getVersion(),
+        queryFn: async () => {
+            if (!isTauri) return "dev";
+            const { getVersion } = await import("@tauri-apps/api/app");
+            return getVersion();
+        },
     });
 }

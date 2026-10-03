@@ -1,6 +1,5 @@
-import Database from "@tauri-apps/plugin-sql";
-import { invoke } from "@tauri-apps/api/core";
-import { config } from "@core/config";
+import { isTauri } from "@core/services/client";
+import { getDb } from "./database";
 
 interface AuthRow {
     id: string;
@@ -22,8 +21,12 @@ export interface AuthRecord {
     accessToken: string;
 }
 
-async function getDb() {
-    return await Database.load(config.dbUrl);
+export interface SaveAuthParams {
+    githubId: number;
+    username: string;
+    avatarUrl: string | undefined;
+    email: string | undefined;
+    accessToken: string;
 }
 
 function rowToRecord(row: AuthRow): AuthRecord {
@@ -37,22 +40,24 @@ function rowToRecord(row: AuthRow): AuthRecord {
     };
 }
 
+/** Browser mode keeps the record in memory only; tokens never hit localStorage. */
+let browserAuth: AuthRecord | undefined;
+
 export async function getAuth(): Promise<AuthRecord | undefined> {
+    if (!isTauri) return browserAuth;
     const db = await getDb();
     const rows = await db.select<AuthRow[]>("SELECT * FROM auth LIMIT 1");
     if (rows.length === 0) return undefined;
     return rowToRecord(rows[0]);
 }
 
-export async function saveAuth(params: {
-    githubId: number;
-    username: string;
-    avatarUrl: string | undefined;
-    email: string | undefined;
-    accessToken: string;
-}): Promise<void> {
+export async function saveAuth(params: SaveAuthParams): Promise<void> {
+    const id = crypto.randomUUID();
+    if (!isTauri) {
+        browserAuth = { id, ...params };
+        return;
+    }
     const db = await getDb();
-    const id = await invoke<string>("generate_auth_id");
 
     // Delete any existing auth record (single-user app)
     await db.execute("DELETE FROM auth");
@@ -72,6 +77,10 @@ export async function saveAuth(params: {
 }
 
 export async function clearAuth(): Promise<void> {
+    if (!isTauri) {
+        browserAuth = undefined;
+        return;
+    }
     const db = await getDb();
     await db.execute("DELETE FROM auth");
 }

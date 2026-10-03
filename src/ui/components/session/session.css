@@ -1,0 +1,125 @@
+/*
+ * grsp session screens: DESIGN.md tokens that the shared Tailwind theme has
+ * no name for. Each reads a global `--grsp-*` variable when the shell defines
+ * one and falls back to the DESIGN.md value. Ink, paper, line and text-3 come
+ * from the theme (foreground, background, border, muted-foreground).
+ */
+.grsp-session {
+    --g-text-1: var(--grsp-text-1, #262626);
+    --g-text-2: var(--grsp-text-2, #525252);
+    --g-text-soft: var(--grsp-text-soft, #404040);
+    --g-panel: var(--grsp-panel, #fafafa);
+    --g-wash: var(--grsp-wash, #f5f5f5);
+    --g-line-strong: var(--grsp-line-strong, #d4d4d4);
+    --g-line-soft: var(--grsp-line-soft, #f0f0f0);
+    --g-code-add: var(--grsp-code-add, #eeeeee);
+    --g-code-hl: var(--grsp-code-hl, #dcdcdc);
+    --g-code-del: var(--grsp-code-del, #fafafa);
+    --g-code-del-text: var(--grsp-code-del-text, #6b6b6b);
+    --g-gutter: var(--grsp-gutter, #8a8a8a);
+}
+
+.dark .grsp-session {
+    --g-text-1: var(--grsp-text-1, #e5e5e5);
+    --g-text-2: var(--grsp-text-2, #a3a3a3);
+    --g-text-soft: var(--grsp-text-soft, #c4c4c4);
+    --g-panel: var(--grsp-panel, #141414);
+    --g-wash: var(--grsp-wash, #1c1c1c);
+    --g-line-strong: var(--grsp-line-strong, #404040);
+    --g-line-soft: var(--grsp-line-soft, #1f1f1f);
+    --g-code-add: var(--grsp-code-add, #262626);
+    --g-code-hl: var(--grsp-code-hl, #3a3a3a);
+    --g-code-del: var(--grsp-code-del, #141414);
+    --g-code-del-text: var(--grsp-code-del-text, #8a8a8a);
+    --g-gutter: var(--grsp-gutter, #737373);
+}
+
+.grsp-session .grsp-text-1 {
+    color: var(--g-text-1);
+}
+.grsp-session .grsp-text-2 {
+    color: var(--g-text-2);
+}
+.grsp-session .grsp-text-soft {
+    color: var(--g-text-soft);
+}
+.grsp-session .grsp-bg-panel {
+    background-color: var(--g-panel);
+}
+.grsp-session .grsp-bg-wash {
+    background-color: var(--g-wash);
+}
+.grsp-session .grsp-border-strong {
+    border-color: var(--g-line-strong);
+}
+.grsp-session .grsp-border-soft {
+    border-color: var(--g-line-soft);
+}
+
+/* Code lines: no syntax colour, only diff state. */
+.grsp-session .grsp-code-line {
+    display: flex;
+    padding-right: 16px;
+    font-size: 12.5px;
+    line-height: 21px;
+    white-space: pre;
+    color: var(--g-text-1);
+}
+.grsp-session .grsp-code-line[data-sign="+"] {
+    background-color: var(--g-code-add);
+    color: hsl(var(--foreground));
+}
+.grsp-session .grsp-code-line[data-sign="-"] {
+    background-color: var(--g-code-del);
+    color: var(--g-code-del-text);
+}
+.grsp-session .grsp-code-line[data-highlight="true"] {
+    background-color: var(--g-code-hl);
+    color: hsl(var(--foreground));
+    font-weight: 500;
+}
+.grsp-session .grsp-code-gutter {
+    width: 44px;
+    flex-shrink: 0;
+    padding-right: 12px;
+    text-align: right;
+    color: var(--g-gutter);
+    user-select: none;
+}
+.grsp-session .grsp-code-sign {
+    width: 18px;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.grsp-session .grsp-skeleton {
+    border-radius: 6px;
+    background-color: var(--g-wash);
+    animation: grsp-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes grsp-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.grsp-session .grsp-progress-dot {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background-color: hsl(var(--foreground));
+    animation: grsp-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .grsp-session .grsp-skeleton,
+    .grsp-session .grsp-progress-dot {
+        animation: none;
+    }
+}

@@ -1,36 +1,36 @@
+import { useEffect } from "react";
 import { useAppStore } from "@core/store/app-store";
+import { useSessions } from "@core/api/useSessions";
 import { EmptyState } from "./EmptyState";
-import { TaskListView } from "@ui/components/tasks/TaskListView";
-import { TaskDetailView } from "@ui/components/tasks/TaskDetailView";
+import { SessionView } from "@ui/components/session/SessionView";
 import { ErrorBoundary } from "@ui/components/ErrorBoundary";
 
 export function MainContent() {
-    const selectedRepositoryId = useAppStore((s) => s.selectedRepositoryId);
-    const selectedTaskId = useAppStore((s) => s.selectedTaskId);
+    const selectedSessionId = useAppStore((s) => s.selectedSessionId);
+    const setSelectedSession = useAppStore((s) => s.setSelectedSession);
+    const { data: sessions } = useSessions();
 
-    if (!selectedRepositoryId) {
+    // Drop a remembered selection once its session is gone (archived, or
+    // its repo folder was removed).
+    const isMissing =
+        !!selectedSessionId &&
+        !!sessions &&
+        !sessions.some((s) => s.id === selectedSessionId);
+    useEffect(() => {
+        if (isMissing) setSelectedSession(undefined);
+    }, [isMissing, setSelectedSession]);
+
+    if (!selectedSessionId || isMissing) {
         return <EmptyState />;
-    }
-
-    if (selectedTaskId) {
-        return (
-            <ErrorBoundary
-                key={selectedTaskId}
-                level="route"
-                heading="Task view crashed"
-            >
-                <TaskDetailView taskId={selectedTaskId} />
-            </ErrorBoundary>
-        );
     }
 
     return (
         <ErrorBoundary
-            key={selectedRepositoryId}
+            key={selectedSessionId}
             level="route"
-            heading="Task list crashed"
+            heading="Review view crashed"
         >
-            <TaskListView repositoryId={selectedRepositoryId} />
+            <SessionView sessionId={selectedSessionId} />
         </ErrorBoundary>
     );
 }

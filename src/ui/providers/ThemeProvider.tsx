@@ -6,7 +6,7 @@ export function ThemeProvider({
     children,
     defaultMode = "system",
     defaultThemeName = "default",
-    storageKey = "sustn-theme",
+    storageKey = "grsp-theme",
 }: {
     children: React.ReactNode;
     defaultMode?: ThemeMode;

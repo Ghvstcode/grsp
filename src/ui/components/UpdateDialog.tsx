@@ -58,7 +58,7 @@ export function UpdateDialog({
                                 <DialogTitle>Update available</DialogTitle>
                             </div>
                             <DialogDescription className="pt-1">
-                                SUSTN v{version} is ready to install. The app
+                                grsp v{version} is ready to install. The app
                                 will restart to apply the update.
                             </DialogDescription>
                         </DialogHeader>

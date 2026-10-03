@@ -1,43 +1,18 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { Sidebar } from "@ui/components/sidebar/Sidebar";
 import { MainContent } from "@ui/components/main/MainContent";
+import { NewReviewDialog } from "@ui/components/sidebar/NewReviewDialog";
 import { ErrorBoundary } from "@ui/components/ErrorBoundary";
-import {
-    useStartupRecovery,
-    useStartupScan,
-    useQueueProcessor,
-    useGlobalTaskNotifications,
-} from "@core/api/useEngine";
 import { useAuth } from "@core/api/useAuth";
-import { useScheduler } from "@core/api/useScheduler";
-import { useLinearAutoSync } from "@core/api/useLinear";
-import { usePrLifecyclePoller } from "@core/api/usePrLifecycle";
-import { startSessionTracking } from "@core/services/session-tracker";
-import { initNotificationPermission } from "@core/services/notifications";
-
-const MIN_WIDTH = 180;
-const MAX_WIDTH = 400;
-const DEFAULT_WIDTH = 270; // w-56
+import { useAppStore } from "@core/store/app-store";
 
 export function AppShell() {
     useAuth();
-    useStartupRecovery();
-    useStartupScan();
-    useScheduler();
-    useLinearAutoSync();
-    usePrLifecyclePoller();
-    useQueueProcessor();
-    useGlobalTaskNotifications();
 
-    const sessionStarted = useRef(false);
-    useEffect(() => {
-        if (sessionStarted.current) return;
-        sessionStarted.current = true;
-        startSessionTracking();
-        void initNotificationPermission();
-    }, []);
-
-    const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+    const sidebarWidth = useAppStore((s) => s.sidebarWidth);
+    const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
+    const isNewReviewOpen = useAppStore((s) => s.isNewReviewOpen);
+    const setNewReviewOpen = useAppStore((s) => s.setNewReviewOpen);
     const isDragging = useRef(false);
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -50,11 +25,8 @@ export function AppShell() {
     useEffect(() => {
         function onMouseMove(e: MouseEvent) {
             if (!isDragging.current) return;
-            const newWidth = Math.min(
-                MAX_WIDTH,
-                Math.max(MIN_WIDTH, e.clientX),
-            );
-            setSidebarWidth(newWidth);
+            // The store clamps to the min/max sidebar width.
+            setSidebarWidth(e.clientX);
         }
 
         function onMouseUp() {
@@ -70,7 +42,7 @@ export function AppShell() {
             window.removeEventListener("mousemove", onMouseMove);
             window.removeEventListener("mouseup", onMouseUp);
         };
-    }, []);
+    }, [setSidebarWidth]);
 
     return (
         <ErrorBoundary level="root">
@@ -80,10 +52,14 @@ export function AppShell() {
                     onMouseDown={handleMouseDown}
                     className="relative z-10 w-0 cursor-col-resize before:absolute before:-left-1 before:top-0 before:h-full before:w-2 before:content-[''] hover:before:bg-ring/20 active:before:bg-ring/30"
                 />
-                <main className="flex-1 overflow-hidden h-full">
+                <main className="flex-1 overflow-hidden h-full min-w-0">
                     <MainContent />
                 </main>
             </div>
+            <NewReviewDialog
+                open={isNewReviewOpen}
+                onOpenChange={setNewReviewOpen}
+            />
         </ErrorBoundary>
     );
 }

@@ -12,6 +12,7 @@ export default tseslint.config(
             "dist/**/*",
             "web/**/*",
             "server/**/*",
+            "evals/**/*",
             "postcss.config.js",
             "tailwind.config.cjs",
         ],

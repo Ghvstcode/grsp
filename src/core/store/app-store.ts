@@ -1,54 +1,42 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export const SIDEBAR_MIN_WIDTH = 200;
+export const SIDEBAR_MAX_WIDTH = 400;
+export const SIDEBAR_DEFAULT_WIDTH = 264;
+
 interface AppStore {
-    selectedRepositoryId: string | undefined;
-    selectedTaskId: string | undefined;
-    /** Epoch ms when the user last viewed each project. */
-    projectLastViewedAt: Record<string, number>;
-    /** Review task IDs the user has already seen, keyed by repo ID. */
-    seenReviewTaskIds: Record<string, string[]>;
-    setSelectedRepository: (id: string | undefined) => void;
-    setSelectedTask: (id: string | undefined) => void;
-    markReviewTasksSeen: (repoId: string, taskIds: string[]) => void;
+    /** The review session shown in the main area. */
+    selectedSessionId: string | undefined;
+    setSelectedSession: (id: string | undefined) => void;
+    sidebarWidth: number;
+    setSidebarWidth: (width: number) => void;
+    /** The "New review" dialog (opened from the sidebar and empty states). */
+    isNewReviewOpen: boolean;
+    setNewReviewOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppStore>()(
     persist(
-        (set, get) => ({
-            selectedRepositoryId: undefined,
-            selectedTaskId: undefined,
-            projectLastViewedAt: {},
-            seenReviewTaskIds: {},
-            setSelectedRepository: (id) => {
-                // Stamp the previously selected project's view time
-                const prev = get().selectedRepositoryId;
-                const updates: Partial<AppStore> = {
-                    selectedRepositoryId: id,
-                    selectedTaskId: undefined,
-                };
-                if (prev) {
-                    updates.projectLastViewedAt = {
-                        ...get().projectLastViewedAt,
-                        [prev]: Date.now(),
-                    };
-                }
-                set(updates);
-            },
-            setSelectedTask: (id) => set({ selectedTaskId: id }),
-            markReviewTasksSeen: (repoId, taskIds) =>
-                set((state) => ({
-                    seenReviewTaskIds: {
-                        ...state.seenReviewTaskIds,
-                        [repoId]: taskIds,
-                    },
-                })),
+        (set) => ({
+            selectedSessionId: undefined,
+            setSelectedSession: (id) => set({ selectedSessionId: id }),
+            sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
+            setSidebarWidth: (width) =>
+                set({
+                    sidebarWidth: Math.min(
+                        SIDEBAR_MAX_WIDTH,
+                        Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)),
+                    ),
+                }),
+            isNewReviewOpen: false,
+            setNewReviewOpen: (open) => set({ isNewReviewOpen: open }),
         }),
         {
-            name: "sustn-app-store",
+            name: "grsp-app-store",
             partialize: (state) => ({
-                projectLastViewedAt: state.projectLastViewedAt,
-                seenReviewTaskIds: state.seenReviewTaskIds,
+                selectedSessionId: state.selectedSessionId,
+                sidebarWidth: state.sidebarWidth,
             }),
         },
     ),

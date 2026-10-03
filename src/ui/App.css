@@ -8,15 +8,19 @@
     }
 
     body {
-        @apply bg-background text-foreground text-sm;
+        @apply bg-background font-sans text-sm text-foreground antialiased;
         font-feature-settings:
             "rlig" 1,
             "calt" 1;
     }
 
     :root {
-        --font-sans: system-ui, -apple-system, sans-serif;
-        --font-mono: "SF Mono", "Fira Code", monospace;
+        /* Geist and Geist Mono are bundled locally (see main.tsx). */
+        --font-sans:
+            "Geist Variable", "Geist", ui-sans-serif, system-ui, -apple-system,
+            "Segoe UI", sans-serif;
+        --font-mono:
+            "Geist Mono Variable", "Geist Mono", ui-monospace, Menlo, monospace;
     }
 
     ::-webkit-scrollbar {
@@ -43,6 +47,13 @@ body {
     overscroll-behavior: none;
     margin: 0;
     padding: 0;
+}
+
+@layer components {
+    /* DESIGN.md section label: 11px, uppercase, 0.06em tracking, text-3. */
+    .section-label {
+        @apply text-[11px] font-medium uppercase leading-none tracking-[0.06em] text-text-3;
+    }
 }
 
 /* Onboarding entrance animations */
