@@ -1,0 +1,55 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Tauri
+src-tauri/target
+
+# pnpm
+.pnpm-store/
+
+# Claude
+settings.local.json
+
+# Husky
+!.husky/
+
+# Next.js (web/ landing page)
+web/.next
+web/out
+web/node_modules
+
+# Auth server
+server/node_modules
+server/dist
+server/.env
+server/.dev.vars
+server/.wrangler
+
+.claude

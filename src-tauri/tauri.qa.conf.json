@@ -1,0 +1,56 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "grsp QA",
+    "version": "0.6.0",
+    "identifier": "app.grsp.desktop.qa",
+    "build": {
+        "beforeDevCommand": "pnpm vite:dev",
+        "devUrl": "http://localhost:1420",
+        "beforeBuildCommand": "pnpm build",
+        "frontendDist": "../dist"
+    },
+    "app": {
+        "windows": [
+            {
+                "title": "grsp QA",
+                "label": "main",
+                "url": "/",
+                "width": 1440,
+                "height": 900,
+                "decorations": true
+            }
+        ],
+        "security": {
+            "csp": null
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": ["icons/icon.icns", "icons/icon.ico", "icons/icon.png"],
+        "createUpdaterArtifacts": true,
+        "macOS": {
+            "entitlements": "macos.entitlements"
+        }
+    },
+    "plugins": {
+        "shell": {
+            "open": "."
+        },
+        "sql": {
+            "preload": ["sqlite:grsp.db"]
+        },
+        "deep-link": {
+            "desktop": {
+                "schemes": ["grsp-qa"]
+            }
+        },
+        "updater": {
+            "dialog": true,
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU3Q0FGODAyMDU0MENFMEUKUldRT3prQUZBdmpLNTdlOWhQMTZGU0t6anlwbEVGWVJYWCs4cGlGdDc1eEdLaUFUcmlmODVxUkcK",
+            "endpoints": [
+                "https://github.com/ghvstcode/grsp/releases/latest/download/latest.json"
+            ]
+        }
+    }
+}

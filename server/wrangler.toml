@@ -1,0 +1,17 @@
+name = "sustn-server"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+APP_DEEP_LINK_SCHEME = "sustn"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sustn-db"
+database_id = "240dbcff-753a-4788-b443-87871b838c67"
+migrations_dir = "migrations"
+
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true

@@ -1,0 +1,48 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "grsp Dev",
+    "version": "0.6.0",
+    "identifier": "app.grsp.desktop.dev",
+    "build": {
+        "beforeDevCommand": "pnpm vite:dev",
+        "devUrl": "http://localhost:1420",
+        "beforeBuildCommand": "pnpm build",
+        "frontendDist": "../dist"
+    },
+    "app": {
+        "windows": [
+            {
+                "title": "grsp Dev",
+                "label": "main",
+                "url": "/",
+                "width": 1440,
+                "height": 900,
+                "decorations": true
+            }
+        ],
+        "security": {
+            "csp": null
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": ["icons/icon.icns", "icons/icon.ico", "icons/icon.png"],
+        "macOS": {
+            "entitlements": "macos.entitlements"
+        }
+    },
+    "plugins": {
+        "shell": {
+            "open": "."
+        },
+        "sql": {
+            "preload": ["sqlite:grsp.db"]
+        },
+        "deep-link": {
+            "desktop": {
+                "schemes": ["grsp-dev"]
+            }
+        }
+    }
+}

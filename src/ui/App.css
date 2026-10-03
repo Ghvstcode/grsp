@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground text-sm;
+        font-feature-settings:
+            "rlig" 1,
+            "calt" 1;
+    }
+
+    :root {
+        --font-sans: system-ui, -apple-system, sans-serif;
+        --font-mono: "SF Mono", "Fira Code", monospace;
+    }
+
+    ::-webkit-scrollbar {
+        width: 7px;
+        height: 7px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: hsl(var(--foreground) / 0.2);
+        border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--foreground) / 0.4);
+    }
+}
+
+html,
+body {
+    overscroll-behavior: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Onboarding entrance animations */
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slow-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fade-in-up 0.7s ease-out both;
+}
+
+.animate-slow-spin {
+    animation: slow-spin 20s linear infinite;
+}
+
+.delay-100 {
+    animation-delay: 100ms;
+}
+.delay-200 {
+    animation-delay: 200ms;
+}
+.delay-300 {
+    animation-delay: 300ms;
+}
+.delay-500 {
+    animation-delay: 500ms;
+}
+.delay-700 {
+    animation-delay: 700ms;
+}
+
+@keyframes slide-indeterminate {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(300%);
+    }
+}
+
+.animate-slide-indeterminate {
+    animation: slide-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes pop-in {
+    0% {
+        opacity: 0;
+        transform: scale(0.5) rotate(-90deg);
+    }
+    70% {
+        transform: scale(1.05) rotate(5deg);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+.animate-pop-in {
+    animation: pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes banner-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.animate-banner-shimmer {
+    animation: banner-shimmer 3s ease-in-out infinite;
+}
+
+/* Premium chat input */
+@keyframes input-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(400%);
+    }
+}
+
+@keyframes input-breathe {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 1px hsl(var(--ring) / 0.12),
+            0 0 15px -3px hsl(var(--ring) / 0.06),
+            0 1px 3px 0 hsl(var(--foreground) / 0.02);
+    }
+    50% {
+        box-shadow:
+            0 0 0 1px hsl(var(--ring) / 0.28),
+            0 0 24px -3px hsl(var(--ring) / 0.12),
+            0 1px 3px 0 hsl(var(--foreground) / 0.02);
+    }
+}
+
+.animate-input-shimmer {
+    animation: input-shimmer 3.5s ease-in-out infinite;
+}
+
+.animate-input-breathe {
+    animation: input-breathe 3s ease-in-out infinite;
+}

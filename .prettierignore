@@ -1,0 +1,7 @@
+src-tauri/gen
+src-tauri/target
+pnpm-lock.yaml
+.github
+web/.next
+web/node_modules
+dist

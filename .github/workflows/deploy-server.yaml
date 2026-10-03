@@ -1,0 +1,44 @@
+name: Deploy Server
+
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - main
+        paths:
+            - "server/**"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "pnpm"
+                  cache-dependency-path: server/pnpm-lock.yaml
+
+            - name: Install dependencies
+              run: cd server && pnpm install --frozen-lockfile
+
+            - name: Run D1 migrations
+              run: cd server && npx wrangler d1 migrations apply sustn-db --remote
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+            - name: Deploy to Cloudflare Workers
+              run: cd server && npx wrangler deploy
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

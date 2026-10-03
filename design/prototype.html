@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>lens — PR #482</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+button,input,textarea{font-family:inherit}
+a{color:#0a0a0a}a:hover{color:#404040}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; overflow: hidden; background: #ffffff; color: #0a0a0a; font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.5">
+
+  <aside style="width: 264px; flex-shrink: 0; border-right: 1px solid #e5e5e5; display: flex; flex-direction: column; gap: 18px; padding: 20px 12px 14px; box-sizing: border-box; background: #fafafa">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 10px">
+      <div style="width: 20px; height: 20px; border: 1.5px solid #0a0a0a; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box">
+        <div style="width: 7px; height: 7px; border-radius: 50%; background: #0a0a0a"></div>
+      </div>
+      <span style="font-weight: 600; font-size: 16px; letter-spacing: -0.02em">lens</span>
+    </div>
+    <button style="height: 40px; margin: 0 4px; border: none; border-radius: 8px; background: #0a0a0a; color: #ffffff; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      New review
+    </button>
+    <div style="display: flex; flex-direction: column; gap: 4px; overflow: auto; min-height: 0; flex-grow: 1">
+      <sc-for list="{{folders}}" as="f" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <button onClick="{{f.toggle}}" aria-expanded="{{f.open}}" style="height: 36px; padding: 0 10px; border: none; background: transparent; border-radius: 7px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: #0a0a0a; text-align: left">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{f.chevStyle}}"><path d="M9 6l6 6-6 6"></path></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+            <span style="font-size: 13px; font-weight: 500; flex-grow: 1">{{f.name}}</span>
+            <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: #737373">{{f.count}}</span>
+          </button>
+          <sc-if value="{{f.open}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 18px; margin-left: 15px; border-left: 1px solid #e5e5e5">
+              <sc-for list="{{f.sessions}}" as="x" hint-placeholder-count="2">
+                <button onClick="{{x.pick}}" style="{{x.style}}">
+                  <span style="display: flex; gap: 8px; align-items: baseline">
+                    <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px">#{{x.num}}</span>
+                    <span style="font-size: 11px; color: #737373">{{x.status}}</span>
+                  </span>
+                  <span style="font-size: 13px; line-height: 1.35">{{x.title}}</span>
+                </button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <button onClick="{{openSettings}}" style="{{settingsBtnStyle}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>
+      Settings
+    </button>
+  </aside>
+
+  <main style="flex-grow: 1; display: flex; flex-direction: column; min-width: 0">
+
+    <sc-if value="{{isPR}}" hint-placeholder-val="{{true}}">
+      <header style="padding: 22px 36px 0; border-bottom: 1px solid #e5e5e5; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">
+        <div style="display: flex; align-items: baseline; gap: 12px">
+          <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 14px; color: #737373">#482</span>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; flex-grow: 1">Require second approval for orders over €10k</h1>
+          <a href="https://github.com/" style="font-size: 13px; text-decoration: none; display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid #e5e5e5; border-radius: 8px">Open on GitHub
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M8 7h9v9"></path></svg>
+          </a>
+        </div>
+        <div style="display: flex; align-items: center; gap: 18px; font-size: 13px; color: #525252; flex-wrap: wrap">
+          <span>@kemi.a</span>
+          <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12px">feat/order-approval → main</span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 50%; background: #0a0a0a"></span>12/12 checks passing</span>
+          <span style="color: #737373">9 files · 6 symbols changed</span>
+          <span style="font-size: 12px; padding: 2px 10px; border-radius: 999px; background: #0a0a0a; color: #ffffff">1 mismatch</span>
+          <sc-if value="{{isPosted}}" hint-placeholder-val="{{false}}">
+            <span style="font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid #0a0a0a; color: #0a0a0a">You: {{verdictLabel}}</span>
+          </sc-if>
+        </div>
+        <nav style="display: flex; gap: 28px; margin-top: 4px">
+          <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+            <button onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+          </sc-for>
+        </nav>
+      </header>
+
+      <div style="flex-grow: 1; min-height: 0; display: flex">
+
+        <sc-if value="{{isGist}}" hint-placeholder-val="{{true}}">
+          <section style="flex-grow: 1; min-width: 0; overflow: auto">
+            <div style="padding: 28px 36px 48px; display: flex; flex-direction: column; gap: 32px">
+
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start">
+                <div style="border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+                  <div style="display: flex; justify-content: space-between; align-items: center">
+                    <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #737373">Author says</span>
+                    <span style="font-size: 11px; color: #737373">~320 words</span>
+                  </div>
+                  <sc-if value="{{descClosed}}" hint-placeholder-val="{{true}}">
+                    <p style="margin: 0; color: #262626; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden">Finance asked for a four-eyes check on large orders after an incident where a high-value order was placed against the wrong customer account and charged before anyone noticed. This PR makes orders over €10,000 wait for a second person with the finance approver role before they're confirmed and the card is charged.</p>
+                  </sc-if>
+                  <sc-if value="{{descOpen}}" hint-placeholder-val="{{false}}">
+                    <div style="display: flex; flex-direction: column; gap: 14px; color: #262626">
+                      <div style="display: flex; flex-direction: column; gap: 4px">
+                        <span style="font-size: 13px; font-weight: 600">Context</span>
+                        <p style="margin: 0">Finance asked for a four-eyes check on large orders after an incident where a high-value order was placed against the wrong customer account and charged before anyone noticed.</p>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 4px">
+                        <span style="font-size: 13px; font-weight: 600">Changes</span>
+                        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px">
+                          <li>New ApprovalPolicy: orders over €10,000 are saved as PENDING_APPROVAL.</li>
+                          <li>New POST /orders/:id/approve, restricted to finance_approver; creators can't approve their own orders.</li>
+                          <li>Approvers get an email when an order needs them.</li>
+                          <li>Payment capture now happens on order.created, after approval.</li>
+                          <li>Migration 0042 adds the status value plus approved_by and approved_at.</li>
+                        </ul>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 4px">
+                        <span style="font-size: 13px; font-weight: 600">Testing</span>
+                        <p style="margin: 0">Unit tests for the policy boundaries and self-approval. Manually tested the approve flow on staging.</p>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 4px">
+                        <span style="font-size: 13px; font-weight: 600">Rollout</span>
+                        <p style="margin: 0">Behind the <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 13px">order_approvals</span> flag, EU tenants first.</p>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <button onClick="{{toggleDesc}}" style="align-self: flex-start; height: 32px; padding: 0; border: none; background: transparent; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 3px">{{descLabel}}</button>
+                </div>
+                <div style="border: 1px solid #0a0a0a; border-radius: 10px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+                  <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase">Code does</span>
+                  <p style="margin: 0; color: #262626">Orders created through <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 13px">POST /orders</span> with a total strictly above €10,000 are saved as PENDING_APPROVAL and approvers are emailed. A new endpoint lets a finance approver, who isn't the creator, confirm them. Payment capture moves to after approval.</p>
+                </div>
+              </div>
+
+              <div style="border: 1.5px solid #0a0a0a; border-radius: 10px; padding: 18px 22px; display: flex; align-items: center; gap: 20px; background: #fafafa">
+                <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; background: #0a0a0a; color: #ffffff; padding: 4px 9px; border-radius: 5px; flex-shrink: 0">Mismatch</span>
+                <p style="margin: 0; flex-grow: 1">The description says <em>all</em> orders over €10k need approval. The nightly <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 13px">BulkImportJob</span> creates orders without going through the approval check.</p>
+                <button onClick="{{goBulk}}" style="flex-shrink: 0; height: 40px; padding: 0 16px; border: 1px solid #0a0a0a; border-radius: 8px; background: #ffffff; font-size: 13px; font-weight: 500; cursor: pointer">Walk through it →</button>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <h2 style="margin: 0; font-size: 15px; font-weight: 600">What's affected</h2>
+                <div style="border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden">
+                  <sc-for list="{{affected}}" as="a" hint-placeholder-count="4">
+                    <div style="{{a.rowStyle}}">
+                      <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 13px; width: 220px; flex-shrink: 0">{{a.name}}</span>
+                      <span style="flex-grow: 1; color: #525252; font-size: 13px">{{a.effect}}</span>
+                      <span style="{{a.tagStyle}}">{{a.tag}}</span>
+                      <button onClick="{{a.pick}}" aria-label="Walk through" style="height: 36px; width: 36px; border: 1px solid #e5e5e5; border-radius: 7px; background: #ffffff; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+                      </button>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <sc-if value="{{showQuestions}}" hint-placeholder-val="{{true}}">
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <div style="display: flex; align-items: baseline; justify-content: space-between">
+                  <h2 style="margin: 0; font-size: 15px; font-weight: 600">Can you answer these?</h2>
+                  <span style="font-size: 12px; color: #737373">{{answeredLabel}}</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <sc-for list="{{questions}}" as="q" hint-placeholder-count="4">
+                    <div style="{{q.boxStyle}}">
+                      <button onClick="{{q.pick}}" style="width: 100%; min-height: 48px; padding: 12px 18px; border: none; background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; font-size: 14px; cursor: pointer; color: #0a0a0a">
+                        <span>{{q.text}}</span>
+                        <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; color: #737373; flex-shrink: 0">{{q.sign}}</span>
+                      </button>
+                      <sc-if value="{{q.open}}" hint-placeholder-val="{{false}}">
+                        <div style="padding: 0 18px 16px; display: flex; flex-direction: column; gap: 8px">
+                          <p style="margin: 0; color: #404040">{{q.answer}}</p>
+                          <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #737373">{{q.ref}}</span>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              </sc-if>
+
+              <div style="border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden">
+                <button onClick="{{toggleDisc}}" aria-expanded="{{discOpen}}" style="width: 100%; min-height: 60px; padding: 14px 20px; border: none; background: #fafafa; display: flex; align-items: center; gap: 14px; cursor: pointer; text-align: left; color: #0a0a0a">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="{{discChevStyle}}"><path d="M9 6l6 6-6 6"></path></svg>
+                  <span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
+                    <span style="font-size: 15px; font-weight: 600">Discussion on GitHub</span>
+                    <span style="font-size: 13px; color: #525252; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">2 open threads: threshold in settings, delegated approvers. 2 resolved.</span>
+                  </span>
+                  <span style="font-size: 12px; color: #737373; flex-shrink: 0">9 comments · 3 people</span>
+                </button>
+                <sc-if value="{{discOpen}}" hint-placeholder-val="{{false}}">
+                  <div style="padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #e5e5e5">
+                    <div style="padding: 14px 16px; border-radius: 8px; background: #f5f5f5; display: flex; flex-direction: column; gap: 4px">
+                      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #525252">Where it stands</span>
+                      <p style="margin: 0; font-size: 13px; color: #262626">The author agreed to move the €10k threshold into settings as a follow-up. Nobody has answered whether delegated approvers could approve their own orders, and that's the one that could matter before merge. The two resolved threads were a rename and a boundary test, both done.</p>
+                    </div>
+                    <sc-for list="{{threads}}" as="th" hint-placeholder-count="4">
+                      <div style="{{th.boxStyle}}">
+                        <button onClick="{{th.toggle}}" aria-expanded="{{th.open}}" style="width: 100%; min-height: 48px; padding: 10px 14px; border: none; background: transparent; display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left; color: #0a0a0a">
+                          <span style="{{th.statusStyle}}">{{th.status}}</span>
+                          <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #525252; flex-shrink: 0">{{th.loc}}</span>
+                          <span style="font-size: 13px; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{th.gist}}</span>
+                          <span style="font-size: 12px; color: #737373; flex-shrink: 0">{{th.countLabel}}</span>
+                        </button>
+                        <sc-if value="{{th.open}}" hint-placeholder-val="{{false}}">
+                          <div style="padding: 4px 14px 14px 14px; display: flex; flex-direction: column; gap: 12px">
+                            <sc-for list="{{th.comments}}" as="c" hint-placeholder-count="2">
+                              <div style="display: flex; gap: 12px">
+                                <div style="width: 26px; height: 26px; border-radius: 50%; border: 1px solid #d4d4d4; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">{{c.initial}}</div>
+                                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex-grow: 1">
+                                  <span style="font-size: 12px"><span style="font-weight: 600">{{c.author}}</span><span style="color: #737373"> · {{c.when}}</span></span>
+                                  <p style="{{c.textStyle}}">{{c.text}}</p>
+                                  <sc-if value="{{c.long}}" hint-placeholder-val="{{false}}">
+                                    <button onClick="{{c.toggle}}" style="align-self: flex-start; height: 28px; padding: 0; border: none; background: transparent; font-size: 12px; font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 3px">{{c.moreLabel}}</button>
+                                  </sc-if>
+                                  <sc-if value="{{c.hasCode}}" hint-placeholder-val="{{false}}">
+                                    <div style="border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden; margin-top: 4px">
+                                      <div style="padding: 7px 12px; background: #fafafa; border-bottom: 1px solid #e5e5e5; display: flex; justify-content: space-between; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: #525252"><span>Suggested change · {{c.code.file}}</span><span>{{c.code.stat}}</span></div>
+                                      <div style="padding: 6px 0; overflow-x: auto">
+                                        <sc-for list="{{c.code.lines}}" as="ln" hint-placeholder-count="2">
+                                          <div style="{{ln.style}}"><span style="{{ln.numStyle}}">{{ln.num}}</span><span style="width: 18px; flex-shrink: 0">{{ln.sign}}</span><span>{{ln.text}}</span></div>
+                                        </sc-for>
+                                      </div>
+                                    </div>
+                                  </sc-if>
+                                </div>
+                              </div>
+                            </sc-for>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+
+            </div>
+          </section>
+
+          <aside style="width: 400px; flex-shrink: 0; border-left: 1px solid #e5e5e5; display: flex; flex-direction: column; min-height: 0">
+            <div style="padding: 18px 20px 14px; border-bottom: 1px solid #e5e5e5; display: flex; flex-direction: column; gap: 10px">
+              <span style="font-size: 15px; font-weight: 600">Ask about this PR</span>
+              <div style="display: flex; gap: 8px">
+                <label for="ask" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Question</label>
+                <input id="ask" type="text" value="{{draft}}" onChange="{{onDraft}}" onKeyDown="{{onAskKey}}" placeholder="e.g. who else calls OrderService.create?" style="flex-grow: 1; min-width: 0; height: 42px; border: 1px solid #d4d4d4; border-radius: 8px; padding: 0 12px; font-size: 13px; color: #0a0a0a; background: #ffffff; outline: none">
+                <button onClick="{{ask}}" style="height: 42px; padding: 0 16px; border: none; border-radius: 8px; background: #0a0a0a; color: #ffffff; font-size: 13px; font-weight: 500; cursor: pointer">Ask</button>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                <sc-for list="{{suggestions}}" as="sg" hint-placeholder-count="3">
+                  <button onClick="{{sg.pick}}" style="min-height: 30px; padding: 4px 10px; border: 1px solid #e5e5e5; border-radius: 999px; background: #ffffff; font-size: 12px; cursor: pointer; color: #404040; text-align: left">{{sg.text}}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="flex-grow: 1; overflow: auto; padding: 18px 20px 28px; display: flex; flex-direction: column; gap: 26px">
+              <sc-for list="{{asked}}" as="qa" hint-placeholder-count="1">
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="align-self: flex-end; max-width: 88%; padding: 9px 13px; border-radius: 10px; background: #0a0a0a; color: #ffffff; font-size: 13px">{{qa.q}}</div>
+                  <div style="display: flex; flex-direction: column; gap: 10px">
+                    <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #737373">{{qa.meta}}</span>
+                    <sc-for list="{{qa.paras}}" as="p" hint-placeholder-count="2">
+                      <p style="margin: 0; font-size: 13.5px; color: #262626">{{p.text}}</p>
+                    </sc-for>
+                    <sc-if value="{{qa.hasCode}}" hint-placeholder-val="{{true}}">
+                      <div style="border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden">
+                        <div style="padding: 7px 12px; background: #fafafa; border-bottom: 1px solid #e5e5e5; display: flex; justify-content: space-between; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: #525252"><span>{{qa.code.file}}</span><span>{{qa.code.stat}}</span></div>
+                        <div style="padding: 6px 0; overflow-x: auto">
+                          <sc-for list="{{qa.code.lines}}" as="ln" hint-placeholder-count="5">
+                            <div style="{{ln.style}}"><span style="{{ln.numStyle}}">{{ln.num}}</span><span style="width: 18px; flex-shrink: 0">{{ln.sign}}</span><span>{{ln.text}}</span></div>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                      <sc-for list="{{qa.refs}}" as="r" hint-placeholder-count="2">
+                        <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; padding: 3px 8px; border: 1px solid #e5e5e5; border-radius: 5px; color: #404040">{{r.label}}</span>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </aside>
+        </sc-if>
+
+        <sc-if value="{{isWalk}}" hint-placeholder-val="{{false}}">
+          <section style="flex-grow: 1; min-width: 0; overflow: auto">
+            <div style="padding: 24px 36px 48px; display: flex; flex-direction: column; gap: 22px">
+              <div style="display: flex; align-items: center; gap: 28px; flex-wrap: wrap">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="font-size: 12px; color: #737373; margin-right: 4px">Entry point</span>
+                  <sc-for list="{{entries}}" as="e" hint-placeholder-count="3">
+                    <button onClick="{{e.pick}}" style="{{e.style}}">{{e.label}}</button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{showWhatIf}}" hint-placeholder-val="{{true}}">
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <span style="font-size: 12px; color: #737373; margin-right: 4px">What if the total is</span>
+                    <sc-for list="{{totals}}" as="tt" hint-placeholder-count="3">
+                      <button onClick="{{tt.pick}}" style="{{tt.style}}">{{tt.label}}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="display: flex; gap: 32px; align-items: flex-start">
+                <div style="width: 360px; flex-shrink: 0; display: flex; flex-direction: column">
+                  <sc-for list="{{blocks}}" as="b" hint-placeholder-count="7">
+                    <div style="display: flex; flex-direction: column; align-items: stretch">
+                      <button onClick="{{b.pick}}" style="{{b.style}}">
+                        <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+                          <span style="{{b.kindStyle}}">{{b.num}} · {{b.kind}}</span>
+                          <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{b.name}}</span>
+                        </span>
+                        <span style="{{b.chipStyle}}">{{b.chip}}</span>
+                      </button>
+                      <sc-if value="{{b.notLast}}" hint-placeholder-val="{{true}}">
+                        <div style="width: 1px; height: 16px; background: #d4d4d4; margin-left: 22px"></div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="flex-grow: 1; min-width: 0; border: 1px solid #e5e5e5; border-radius: 12px; padding: 24px 26px; display: flex; flex-direction: column; gap: 18px">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+                    <span style="font-size: 12px; color: #737373">Step {{stepNum}} of {{stepCount}} · {{cur.kind}}</span>
+                    <span style="{{curChipStyle}}">{{curChip}}</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px">
+                    <h2 style="margin: 0; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 20px; font-weight: 500; letter-spacing: -0.01em">{{cur.name}}</h2>
+                    <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #737373">{{cur.file}}</span>
+                  </div>
+                  <p style="margin: 0; font-size: 15px; color: #262626; max-width: 680px">{{curNote}}</p>
+
+                  <sc-if value="{{hasDecision}}" hint-placeholder-val="{{true}}">
+                    <div style="display: flex; flex-direction: column; gap: 10px">
+                      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #737373">Decision</span>
+                      <div style="display: flex; align-items: center; gap: 14px">
+                        <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 13px; padding: 10px 14px; border: 1px solid #0a0a0a; border-radius: 8px">{{cur.decision.cond}}</span>
+                        <div style="display: flex; flex-direction: column; gap: 8px">
+                          <span style="{{yesStyle}}">yes → {{cur.decision.yes}}</span>
+                          <span style="{{noStyle}}">no → {{cur.decision.no}}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{showCodeBlock}}" hint-placeholder-val="{{true}}">
+                    <div style="border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden">
+                      <div style="padding: 8px 14px; background: #fafafa; border-bottom: 1px solid #e5e5e5; display: flex; justify-content: space-between; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #525252"><span>{{walkCode.file}}</span><span>{{walkCode.stat}}</span></div>
+                      <div style="padding: 8px 0; overflow-x: auto">
+                        <sc-for list="{{walkCode.lines}}" as="ln" hint-placeholder-count="7">
+                          <div style="{{ln.style}}"><span style="{{ln.numStyle}}">{{ln.num}}</span><span style="width: 18px; flex-shrink: 0">{{ln.sign}}</span><span>{{ln.text}}</span></div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{showNoCode}}" hint-placeholder-val="{{false}}">
+                    <div style="padding: 12px 14px; border: 1px dashed #d4d4d4; border-radius: 8px; font-size: 13px; color: #737373">No code changes in this block.</div>
+                  </sc-if>
+
+                  <div style="display: flex; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px solid #f0f0f0">
+                    <button onClick="{{prev}}" style="height: 40px; padding: 0 14px; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; font-size: 13px; cursor: pointer">← Back</button>
+                    <button onClick="{{next}}" style="height: 40px; padding: 0 18px; border: none; border-radius: 8px; background: #0a0a0a; color: #ffffff; font-size: 13px; font-weight: 500; cursor: pointer">Step →</button>
+                    <button onClick="{{toggleCode}}" style="height: 40px; padding: 0 14px; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; font-size: 13px; cursor: pointer; margin-left: auto">{{codeLabel}}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isReview}}" hint-placeholder-val="{{false}}">
+          <section style="flex-grow: 1; min-width: 0; overflow: auto">
+            <div style="padding: 28px 36px 48px; display: flex; flex-direction: column; gap: 22px; max-width: 980px">
+
+              <sc-if value="{{reviewIdle}}" hint-placeholder-val="{{true}}">
+                <div style="border: 1px solid #e5e5e5; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 18px">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <h2 style="margin: 0; font-size: 18px; font-weight: 600">Run an AI review</h2>
+                    <p style="margin: 0; color: #525252">Reads the change, the paths it touches and the existing discussion, then drafts inline comments. Nothing is posted until you choose a verdict.</p>
+                  </div>
+                  <div style="padding: 14px 16px; border-radius: 8px; background: #f5f5f5; display: flex; flex-direction: column; gap: 6px">
+                    <div style="display: flex; justify-content: space-between; align-items: center">
+                      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #525252">Your review prompt</span>
+                      <button onClick="{{openSettings}}" style="height: 28px; padding: 0; border: none; background: transparent; font-size: 12px; font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 3px">Edit</button>
+                    </div>
+                    <p style="margin: 0; font-size: 13px; color: #262626; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">{{prompt}}</p>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 14px">
+                    <button onClick="{{runReview}}" style="height: 44px; padding: 0 22px; border: none; border-radius: 8px; background: #0a0a0a; color: #ffffff; font-size: 14px; font-weight: 500; cursor: pointer">Run review</button>
+                    <span style="font-size: 12px; color: #737373">{{providerLabel}}</span>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{reviewDone}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; flex-direction: column; gap: 22px">
+                  <div style="display: flex; align-items: center; gap: 14px">
+                    <h2 style="margin: 0; font-size: 18px; font-weight: 600; flex-grow: 1">3 findings <span style="font-weight: 400; color: #737373">· 1 blocking</span></h2>
+                    <button onClick="{{runReview}}" style="height: 36px; padding: 0 14px; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; font-size: 13px; cursor: pointer">Re-run</button>
+                  </div>
+
+                  <sc-for list="{{findings}}" as="fd" hint-placeholder-count="3">
+                    <article style="{{fd.boxStyle}}">
+                      <div style="display: flex; align-items: center; gap: 12px">
+                        <span style="{{fd.sevStyle}}">{{fd.sev}}</span>
+                        <h3 style="margin: 0; font-size: 15px; font-weight: 600; flex-grow: 1">{{fd.title}}</h3>
+                        <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #525252">{{fd.loc}}</span>
+                      </div>
+                      <p style="margin: 0; color: #404040">{{fd.why}}</p>
+                      <div style="border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden">
+                        <div style="padding: 7px 12px; background: #fafafa; border-bottom: 1px solid #e5e5e5; display: flex; justify-content: space-between; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: #525252"><span>{{fd.code.file}}</span><span>{{fd.code.stat}}</span></div>
+                        <div style="padding: 6px 0; overflow-x: auto">
+                          <sc-for list="{{fd.code.lines}}" as="ln" hint-placeholder-count="6">
+                            <div style="{{ln.style}}"><span style="{{ln.numStyle}}">{{ln.num}}</span><span style="width: 18px; flex-shrink: 0">{{ln.sign}}</span><span>{{ln.text}}</span></div>
+                          </sc-for>
+                        </div>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 6px">
+                        <label for="{{fd.inputId}}" style="font-size: 12px; color: #525252">Comment to post on line {{fd.line}}</label>
+                        <textarea id="{{fd.inputId}}" value="{{fd.draft}}" onChange="{{fd.onDraft}}" rows="3" style="width: 100%; box-sizing: border-box; border: 1px solid #d4d4d4; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: #0a0a0a; resize: vertical"></textarea>
+                      </div>
+                      <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; min-height: 32px">
+                        <input type="checkbox" checked="{{fd.included}}" onChange="{{fd.toggle}}" style="width: 16px; height: 16px; accent-color: #0a0a0a">
+                        Include in review
+                      </label>
+                    </article>
+                  </sc-for>
+
+                  <sc-if value="{{notPosted}}" hint-placeholder-val="{{true}}">
+                    <div style="border: 1.5px solid #0a0a0a; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px">
+                      <h3 style="margin: 0; font-size: 15px; font-weight: 600">Submit to GitHub</h3>
+                      <div style="display: flex; gap: 8px" role="group" aria-label="Verdict">
+                        <sc-for list="{{verdicts}}" as="v" hint-placeholder-count="3">
+                          <button onClick="{{v.pick}}" aria-pressed="{{v.active}}" style="{{v.style}}">{{v.label}}</button>
+                        </sc-for>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 6px">
+                        <label for="summary" style="font-size: 12px; color: #525252">Summary comment</label>
+                        <textarea id="summary" value="{{summary}}" onChange="{{onSummary}}" rows="2" style="width: 100%; box-sizing: border-box; border: 1px solid #d4d4d4; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: #0a0a0a; resize: vertical"></textarea>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 14px">
+                        <button onClick="{{post}}" style="height: 44px; padding: 0 22px; border: none; border-radius: 8px; background: #0a0a0a; color: #ffffff; font-size: 14px; font-weight: 500; cursor: pointer">{{postLabel}}</button>
+                        <span style="font-size: 12px; color: #737373">Posts as @tobi via your GitHub connection</span>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{isPosted}}" hint-placeholder-val="{{false}}">
+                    <div style="border-radius: 12px; padding: 20px 24px; background: #0a0a0a; color: #ffffff; display: flex; align-items: center; gap: 16px">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg>
+                      <span style="flex-grow: 1">Review posted to acme/orders-api #482 · {{verdictLabel}} · {{includedCount}} inline comments</span>
+                      <a href="https://github.com/" style="color: #ffffff; font-size: 13px; font-weight: 500">View on GitHub</a>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </section>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isSettings}}" hint-placeholder-val="{{false}}">
+      <header style="padding: 26px 40px 20px; border-bottom: 1px solid #e5e5e5; flex-shrink: 0">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em">Settings</h1>
+      </header>
+      <section style="flex-grow: 1; overflow: auto; min-height: 0">
+        <div style="padding: 8px 40px 56px; max-width: 760px; display: flex; flex-direction: column">
+
+          <div style="padding: 26px 0; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <label for="prompt" style="font-size: 15px; font-weight: 600">Review prompt</label>
+              <span style="font-size: 13px; color: #525252">Sent with every AI review. Describe what you care about in this codebase.</span>
+            </div>
+            <textarea id="prompt" value="{{prompt}}" onChange="{{onPrompt}}" rows="5" style="width: 100%; box-sizing: border-box; border: 1px solid #d4d4d4; border-radius: 8px; padding: 12px 14px; font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.6; color: #0a0a0a; resize: vertical"></textarea>
+            <div style="display: flex; gap: 14px; align-items: center">
+              <button onClick="{{resetPrompt}}" style="height: 36px; padding: 0 14px; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; font-size: 13px; cursor: pointer">Reset to default</button>
+              <span style="font-size: 12px; color: #737373">You can override this per repository in .lens/prompt.md</span>
+            </div>
+          </div>
+
+          <div style="padding: 26px 0; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 14px">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 15px; font-weight: 600">Agent</span>
+              <span style="font-size: 13px; color: #525252">lens runs on the coding agent you already have installed and uses your existing subscription. No API keys.</span>
+            </div>
+            <div style="display: flex; gap: 8px" role="group" aria-label="Agent">
+              <sc-for list="{{providers}}" as="pv" hint-placeholder-count="2">
+                <button onClick="{{pv.pick}}" aria-pressed="{{pv.active}}" style="{{pv.style}}">{{pv.label}}</button>
+              </sc-for>
+            </div>
+            <div style="border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden; max-width: 560px">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f0f0f0">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: #0a0a0a; flex-shrink: 0"></span>
+                <span style="font-size: 14px; flex-grow: 1">{{agent.name}} detected</span>
+                <button style="height: 32px; padding: 0 12px; border: 1px solid #e5e5e5; border-radius: 7px; background: #ffffff; font-size: 12px; cursor: pointer">Re-check</button>
+              </div>
+              <div style="display: flex; padding: 10px 16px; gap: 16px; font-size: 13px; border-bottom: 1px solid #f0f0f0"><span style="width: 90px; color: #737373">Binary</span><span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{agent.path}}</span></div>
+              <div style="display: flex; padding: 10px 16px; gap: 16px; font-size: 13px; border-bottom: 1px solid #f0f0f0"><span style="width: 90px; color: #737373">Account</span><span>Signed in · subscription</span></div>
+              <div style="display: flex; padding: 10px 16px; gap: 16px; font-size: 13px"><span style="width: 90px; color: #737373">Runs as</span><span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{agent.cmd}}</span></div>
+            </div>
+            <span style="font-size: 12px; color: #737373">The agent runs in a read-only worktree of the PR. lens never stores credentials.</span>
+          </div>
+
+          <div style="padding: 26px 0; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 15px; font-weight: 600; padding-bottom: 8px">Analysis</span>
+            <sc-for list="{{toggles}}" as="tg" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 20px; padding: 10px 0">
+                <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+                  <span style="font-size: 14px">{{tg.label}}</span>
+                  <span style="font-size: 12.5px; color: #525252">{{tg.help}}</span>
+                </div>
+                <button onClick="{{tg.toggle}}" aria-pressed="{{tg.on}}" aria-label="{{tg.label}}" style="width: 52px; height: 44px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+                  <span style="{{tg.trackStyle}}"><span style="{{tg.knobStyle}}"></span></span>
+                </button>
+              </div>
+            </sc-for>
+            <div style="display: flex; align-items: center; gap: 20px; padding: 10px 0">
+              <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+                <span style="font-size: 14px">Trace depth</span>
+                <span style="font-size: 12.5px; color: #525252">How many calls out from a changed symbol to follow.</span>
+              </div>
+              <div style="display: flex; gap: 6px" role="group" aria-label="Trace depth">
+                <sc-for list="{{hops}}" as="h" hint-placeholder-count="3">
+                  <button onClick="{{h.pick}}" aria-pressed="{{h.active}}" style="{{h.style}}">{{h.label}}</button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 26px 0; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 15px; font-weight: 600; padding-bottom: 8px">Git hosts</span>
+            <sc-for list="{{hosts}}" as="ho" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0">
+                <span style="font-size: 14px; width: 120px">{{ho.name}}</span>
+                <span style="font-size: 13px; color: #525252; flex-grow: 1">{{ho.status}}</span>
+                <button style="{{ho.btnStyle}}">{{ho.action}}</button>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding: 26px 0; display: flex; flex-direction: column; gap: 4px">
+            <div style="display: flex; align-items: center; padding-bottom: 8px">
+              <span style="font-size: 15px; font-weight: 600; flex-grow: 1">Repositories</span>
+              <button style="height: 36px; padding: 0 14px; border: 1px solid #e5e5e5; border-radius: 8px; background: #ffffff; font-size: 13px; cursor: pointer">Add folder</button>
+            </div>
+            <sc-for list="{{repos}}" as="rp" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid #f5f5f5">
+                <span style="font-size: 14px; width: 180px">{{rp.name}}</span>
+                <span style="font-family: 'Geist Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #525252; flex-grow: 1">{{rp.path}}</span>
+                <span style="font-size: 12px; color: #737373">{{rp.lang}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+var DEFAULT_PROMPT = "You are reviewing a pull request for a payments-adjacent backend. Prioritise correctness and data integrity over style. Flag any path where money moves or state changes without the checks the PR description promises. Group findings as Blocking, Should fix or Nit. Keep each comment under 80 words and suggest a concrete fix.";
+var MONO = "font-family: 'Geist Mono', ui-monospace, Menlo, monospace; ";
+
+function codeBlock(file, start, rows, hl) {
+  var n = start, adds = 0, dels = 0;
+  var lines = rows.map(function (r) {
+    var k = r[0], t = r[1], num = '';
+    if (k === 'del') { dels++; } else { num = String(n); n++; }
+    if (k === 'add') adds++;
+    var isHl = hl && num === String(hl);
+    var bg = k === 'add' ? 'background: #eeeeee; color: #0a0a0a;' : k === 'del' ? 'background: #fafafa; color: #6b6b6b;' : 'color: #262626;';
+    if (isHl) bg = 'background: #dcdcdc; color: #0a0a0a; font-weight: 500;';
+    return {
+      num: num, sign: k === 'add' ? '+' : k === 'del' ? '−' : '', text: t,
+      style: MONO + 'display: flex; font-size: 12.5px; line-height: 21px; white-space: pre; padding-right: 16px; ' + bg,
+      numStyle: 'width: 44px; flex-shrink: 0; text-align: right; padding-right: 12px; color: #8a8a8a; user-select: none;'
+    };
+  });
+  var stat = (adds || dels) ? ('+' + adds + ' −' + dels) : ('lines ' + start + '–' + (n - 1));
+  return { file: file, stat: stat, lines: lines };
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      view: 'pr', tab: 'gist', folders: { orders: true, payments: true, web: false },
+      descOpen: false, discOpen: false, threadsOpen: { t1: true, t2: true }, moreC: {},
+      openQ: -1, seen: {}, draft: '', asked: [this.answerFor('What happens if the payment provider times out after approval?')],
+      entry: 'orders', step: 3, total: 25000, showCode: true,
+      review: 'idle', include: { f1: true, f2: true, f3: true }, drafts: {}, verdict: 'request',
+      summary: 'Blocking: bulk imports skip the new approval check. Two smaller notes inline.',
+      prompt: DEFAULT_PROMPT, provider: 'claude', hopsN: 2,
+      opts: { showUnchanged: true, questions: true, autoRun: false }
+    };
+  }
+
+  answerFor(q) {
+    var l = q.toLowerCase();
+    if (/time|timeout|payment|capture|fail/.test(l)) return {
+      q: q, meta: 'Traced 3 symbols · 2 files',
+      paras: ['Approval is saved before the charge. ApprovalService.approve commits status = CONFIRMED and emits order.created; the consumer then calls PaymentService.capture.',
+        'If capture times out, the consumer retries 3 times with exponential backoff, then sends the event to the dead-letter queue. The order stays CONFIRMED but unpaid, and nothing alerts finance. That gap existed before, but this PR makes it more likely for large orders, since they now sit pending and get charged later.'],
+      code: codeBlock('orders/consumers.py', 30, [['ctx', '@consumer("order.created", retries=3, backoff="exp")'], ['ctx', 'def on_order_created(event):'], ['ctx', '    order = Order.objects.get(id=event.order_id)'], ['ctx', '    if order.status != Status.CONFIRMED:'], ['ctx', '        return'], ['ctx', '    PaymentService.capture(order)  # raises on timeout']], 35),
+      refs: ['approvals/service.py:47', 'orders/consumers.py:35', 'payments/service.py:88']
+    };
+    if (/test/.test(l)) return {
+      q: q, meta: 'Searched tests · 2 files',
+      paras: ['Tests cover the policy at €9,999, €10,000 and €10,000.01, the self-approval rejection, and the role check on the approve endpoint.', 'Nothing covers BulkImportJob or the path where the approver email fails.'],
+      code: null, refs: ['tests/test_policy.py', 'tests/test_approvals.py:88']
+    };
+    if (/bulk|import|job|skip/.test(l)) return {
+      q: q, meta: 'Traced 2 symbols · 2 files',
+      paras: ['Yes. BulkImportJob calls OrderRepository.insert_many directly, which hard-codes CONFIRMED and never goes through OrderService, so the policy never runs.'],
+      code: codeBlock('orders/repository.py', 101, [['ctx', 'def insert_many(self, rows):'], ['ctx', '    orders = [Order.from_row(r) for r in rows]'], ['ctx', '    for o in orders:'], ['ctx', '        o.status = Status.CONFIRMED'], ['ctx', '    Order.objects.bulk_create(orders)']], 104),
+      refs: ['jobs/bulk_import.py:57', 'orders/repository.py:104']
+    };
+    if (/threshold|10k|10,000|limit|config|defined/.test(l)) return {
+      q: q, meta: 'Found 1 definition',
+      paras: ['It is a module constant in orders/policies.py, in EUR, compared with a strict greater-than. It is not tenant-specific and can only change with a deploy. There is an open review thread asking to move it into settings.'],
+      code: codeBlock('orders/policies.py', 1, [['add', 'THRESHOLD = Money("10000.00", "EUR")'], ['add', ''], ['add', 'class ApprovalPolicy:'], ['add', '    @staticmethod'], ['add', '    def check(order):'], ['add', '        if order.total > THRESHOLD:']], 1),
+      refs: ['orders/policies.py:1']
+    };
+    return {
+      q: q, meta: 'No direct match',
+      paras: ["Nothing changed in this PR matches that directly. The closest changed symbols are OrderService.create and ApprovalService.approve. Try asking about one of those, or about a specific behaviour."],
+      code: null, refs: []
+    };
+  }
+
+  blockDefs() {
+    return {
+      route_orders: { name: 'POST /orders', kind: 'Route', change: 'same', file: 'api/views/orders.py', note: 'Request enters and the body is parsed into CreateOrderInput. Nothing changed here.' },
+      validate: { name: 'CreateOrderSchema.validate', kind: 'Validation', change: 'same', file: 'orders/schemas.py', note: 'Checks line items and currency. Unchanged.' },
+      svc_create: { name: 'OrderService.create', kind: 'Service', change: 'changed', file: 'orders/services.py', note: 'Now asks ApprovalPolicy before saving. Previously every valid order was saved straight to CONFIRMED.',
+        code: ['orders/services.py', 18, [['ctx', 'def create(self, data):'], ['ctx', '    order = Order.from_input(data)'], ['del', '    order.status = Status.CONFIRMED'], ['add', '    decision = ApprovalPolicy.check(order)'], ['add', '    if decision is Decision.REQUIRES_APPROVAL:'], ['add', '        order.status = Status.PENDING_APPROVAL'], ['add', '    else:'], ['add', '        order.status = Status.CONFIRMED'], ['ctx', '    self.repo.insert(order)']]] },
+      policy: { name: 'ApprovalPolicy.check', kind: 'Policy', change: 'new', file: 'orders/policies.py', note: '',
+        decision: { cond: 'order.total > €10,000', yes: 'REQUIRES_APPROVAL', no: 'OK' },
+        code: ['orders/policies.py', 1, [['add', 'THRESHOLD = Money("10000.00", "EUR")'], ['add', ''], ['add', 'class ApprovalPolicy:'], ['add', '    @staticmethod'], ['add', '    def check(order):'], ['add', '        if order.total > THRESHOLD:'], ['add', '            return Decision.REQUIRES_APPROVAL'], ['add', '        return Decision.OK']]] },
+      insert_pending: { name: 'orders.insert', kind: 'DB write', change: 'changed', file: 'orders/repository.py', note: 'Row is saved with status = PENDING_APPROVAL, a new value added in migration 0042. No payment is taken yet.' },
+      emit_req: { name: 'emit approval.requested', kind: 'Event', change: 'new', file: 'orders/events.py', note: 'New event. Only the approvals worker consumes it.' },
+      notify: { name: 'Mailer.send → approvers', kind: 'External', change: 'new', file: 'approvals/notify.py', note: 'Emails everyone with the finance_approver role. Runs after commit; failures are logged but not retried.',
+        code: ['approvals/notify.py', 14, [['add', 'def notify_approvers(order):'], ['add', '    approvers = User.objects.with_role("finance_approver")'], ['add', '    for user in approvers:'], ['add', '        try:'], ['add', '            mailer.send(user.email, approval_email(order))'], ['add', '        except MailerError:'], ['add', '            log.warning("approval email failed", order=order.id)']]] },
+      insert_conf: { name: 'orders.insert', kind: 'DB write', change: 'same', file: 'orders/repository.py', note: 'Row is saved with status = CONFIRMED, same as before this PR.' },
+      emit_created: { name: 'emit order.created', kind: 'Event', change: 'same', file: 'orders/events.py', note: 'Fulfilment starts downstream. Unchanged.' },
+      capture: { name: 'PaymentService.capture', kind: 'External', change: 'same', file: 'payments/service.py', note: 'Card is charged. Unchanged, but it now runs only for confirmed orders.' },
+      route_approve: { name: 'POST /orders/:id/approve', kind: 'Route', change: 'new', file: 'api/views/approvals.py', note: 'New endpoint the finance dashboard calls to approve a pending order.' },
+      auth: { name: "requires_role('finance_approver')", kind: 'Auth', change: 'new', file: 'api/permissions.py', note: 'Anyone without the finance_approver role gets a 403.' },
+      approve_svc: { name: 'ApprovalService.approve', kind: 'Service', change: 'new', file: 'approvals/service.py', note: 'Rejects the request if the order is not pending, or if the approver is the person who created it.',
+        decision: { cond: 'approver == order.created_by', yes: '403 Forbidden', no: 'continue' },
+        code: ['approvals/service.py', 35, [['add', 'def approve(self, order_id, approver):'], ['add', '    order = self.repo.get(order_id)'], ['add', '    if order.status != Status.PENDING_APPROVAL:'], ['add', '        raise InvalidState()'], ['add', '    if approver.id == order.created_by:'], ['add', '        raise Forbidden("cannot approve own order")'], ['add', '    order.confirm(approved_by=approver.id)']]] },
+      update: { name: 'orders.update', kind: 'DB write', change: 'new', file: 'orders/repository.py', note: 'Sets status = CONFIRMED and records approved_by and approved_at.' },
+      job: { name: 'BulkImportJob.run', kind: 'Job', change: 'same', file: 'jobs/bulk_import.py', note: 'Nightly CSV import from the B2B portal. Not touched by this PR.' },
+      insert_many: { name: 'OrderRepository.insert_many', kind: 'Repository', change: 'gap', file: 'orders/repository.py', note: 'Writes orders directly and skips OrderService, so ApprovalPolicy never runs. A €25,000 imported order lands CONFIRMED with no approval.',
+        code: ['orders/repository.py', 101, [['ctx', 'def insert_many(self, rows):'], ['ctx', '    orders = [Order.from_row(r) for r in rows]'], ['ctx', '    for o in orders:'], ['ctx', '        o.status = Status.CONFIRMED'], ['ctx', '    Order.objects.bulk_create(orders)']], 104] }
+    };
+  }
+
+  path() {
+    var s = this.state, ids;
+    if (s.entry === 'approve') ids = ['route_approve', 'auth', 'approve_svc', 'update', 'emit_created', 'capture'];
+    else if (s.entry === 'bulk') ids = ['job', 'insert_many', 'insert_conf', 'emit_created'];
+    else {
+      var head = ['route_orders', 'validate', 'svc_create', 'policy'];
+      ids = s.total > 10000 ? head.concat(['insert_pending', 'emit_req', 'notify']) : head.concat(['insert_conf', 'emit_created', 'capture']);
+    }
+    if (!s.opts.showUnchanged) {
+      var defs = this.blockDefs();
+      ids = ids.filter(function (id) { return defs[id].change !== 'same'; });
+    }
+    return ids;
+  }
+
+  chipFor(change, inverted) {
+    var labels = { new: 'New', changed: 'Changed', same: 'Unchanged', gap: 'Not covered' };
+    var base = MONO + 'font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; flex-shrink: 0; white-space: nowrap; ';
+    var st;
+    if (inverted) st = base + 'border: 1px solid #ffffff; color: #ffffff;';
+    else if (change === 'same') st = base + 'border: 1px solid #e5e5e5; color: #737373;';
+    else if (change === 'gap') st = base + 'border: 1px dashed #0a0a0a; color: #0a0a0a;';
+    else if (change === 'new') st = base + 'background: #0a0a0a; color: #ffffff; border: 1px solid #0a0a0a;';
+    else st = base + 'border: 1px solid #0a0a0a; color: #0a0a0a;';
+    return { text: labels[change], style: st };
+  }
+
+  boxStyle(change, current) {
+    var base = 'width: 100%; min-height: 56px; padding: 10px 14px; border-radius: 9px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; cursor: pointer; box-sizing: border-box; ';
+    if (current) return base + 'background: #0a0a0a; color: #ffffff; border: 1.5px solid #0a0a0a;';
+    if (change === 'same') return base + 'background: #ffffff; color: #737373; border: 1px solid #e5e5e5;';
+    if (change === 'gap') return base + 'background: #fafafa; color: #0a0a0a; border: 1.5px dashed #0a0a0a;';
+    return base + 'background: #ffffff; color: #0a0a0a; border: 1.5px solid #0a0a0a;';
+  }
+
+  seg(active) {
+    return 'height: 38px; padding: 0 14px; border-radius: 8px; font-size: 13px; cursor: pointer; ' + (active ? 'background: #0a0a0a; color: #ffffff; border: 1px solid #0a0a0a;' : 'background: #ffffff; color: #0a0a0a; border: 1px solid #e5e5e5;');
+  }
+
+  renderVals() {
+    var self = this, s = this.state, defs = this.blockDefs();
+    var set = function (o) { return function () { self.setState(o); }; };
+
+    var folderData = [
+      { id: 'orders', name: 'orders-api', sessions: [[482, 'In progress', 'Require second approval for orders over €10k', true], [479, 'Reviewed', 'Migrate invoices to v2 schema']] },
+      { id: 'payments', name: 'payments-service', sessions: [[471, 'Merged', 'Rate-limit webhook retries'], [466, 'Reviewed', 'Idempotency keys for refunds']] },
+      { id: 'web', name: 'web-dashboard', sessions: [[468, 'Reviewed', 'Approvals inbox for finance'], [455, 'Merged', 'Dark mode tokens']] }
+    ];
+    var folders = folderData.map(function (f) {
+      var open = !!s.folders[f.id];
+      return {
+        name: f.name, count: String(f.sessions.length), open: open,
+        chevStyle: 'flex-shrink: 0; transition: transform 120ms; transform: rotate(' + (open ? 90 : 0) + 'deg);',
+        toggle: function () { var fo = Object.assign({}, self.state.folders); fo[f.id] = !open; self.setState({ folders: fo }); },
+        sessions: f.sessions.map(function (x) {
+          var active = x[3] && s.view === 'pr';
+          return {
+            num: String(x[0]), status: x[1], title: x[2],
+            style: 'width: 100%; padding: 8px 10px; border-radius: 8px; display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer; color: #0a0a0a; ' + (active ? 'background: #ffffff; border: 1px solid #e5e5e5;' : 'background: transparent; border: 1px solid transparent;'),
+            pick: set({ view: 'pr' })
+          };
+        })
+      };
+    });
+
+    var tabs = [['gist', 'Gist'], ['walk', 'Walkthrough'], ['review', 'Review']].map(function (t) {
+      return { label: t[1], pick: set({ tab: t[0] }), style: 'height: 40px; padding: 0; border: none; background: transparent; font-size: 14px; cursor: pointer; ' + (s.tab === t[0] ? 'color: #0a0a0a; font-weight: 600; box-shadow: inset 0 -2px 0 #0a0a0a;' : 'color: #737373;') };
+    });
+
+    var tagBase = 'font-size: 11px; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; width: 92px; text-align: center; box-sizing: border-box; ';
+    var aff = [
+      ['POST /orders', 'New pending state, emails approvers, defers payment', 'Changed', 'changed', 'orders'],
+      ['POST /orders/:id/approve', 'New endpoint: confirms order, then charges card', 'New', 'new', 'approve'],
+      ['BulkImportJob (nightly)', 'Still creates orders as CONFIRMED, no approval', 'Not covered', 'gap', 'bulk'],
+      ['order.created consumer', 'Now fires later for large orders, after approval', 'Timing', 'changed', 'approve']
+    ];
+    var affected = aff.map(function (a, i) {
+      return {
+        name: a[0], effect: a[1], tag: a[2],
+        rowStyle: 'display: flex; align-items: center; gap: 16px; padding: 10px 14px 10px 18px; ' + (i < aff.length - 1 ? 'border-bottom: 1px solid #f0f0f0;' : ''),
+        tagStyle: tagBase + (a[3] === 'new' ? 'background: #0a0a0a; color: #ffffff; border: 1px solid #0a0a0a;' : a[3] === 'gap' ? 'border: 1px dashed #0a0a0a; color: #0a0a0a;' : 'border: 1px solid #0a0a0a; color: #0a0a0a;'),
+        pick: set({ tab: 'walk', entry: a[4], step: 0 })
+      };
+    });
+
+    var qs = [
+      ['What happens to orders already pending payment when this deploys?', 'Nothing changes for them. Migration 0042 only adds the PENDING_APPROVAL value and two nullable columns; existing rows keep their status. The policy runs on create only.', 'orders/migrations/0042.py · orders/services.py:22'],
+      ['Can the person who created an order also approve it?', 'No. ApprovalService.approve rejects with 403 when the approver created the order, and a test covers it.', 'approvals/service.py:39 · tests/test_approvals.py:88'],
+      ['Is there any way a €10k+ order gets confirmed without approval?', 'Yes. BulkImportJob writes through OrderRepository.insert_many and never touches OrderService, so the policy is skipped.', 'jobs/bulk_import.py:57 · orders/repository.py:104'],
+      ['What happens if the approver email fails to send?', 'The error is logged and not retried. The order stays PENDING_APPROVAL with nobody notified. No test covers this path.', 'approvals/notify.py:19']
+    ];
+    var questions = qs.map(function (q, i) {
+      var open = s.openQ === i;
+      return {
+        text: q[0], answer: q[1], ref: q[2], open: open, sign: open ? '−' : '+',
+        boxStyle: 'border-radius: 10px; ' + (open ? 'border: 1px solid #0a0a0a;' : 'border: 1px solid #e5e5e5;'),
+        pick: function () { var seen = Object.assign({}, self.state.seen); seen[i] = true; self.setState({ openQ: open ? -1 : i, seen: seen }); }
+      };
+    });
+
+    var threadData = [
+      { id: 't1', status: 'Open', loc: 'orders/policies.py:1', gist: 'Move the €10k threshold into settings?', comments: [
+        ['dayo.b', '2d ago', "Should the threshold live in settings? Finance will want to change it without a deploy, and different tenants probably want different limits. We've been burned by hard-coded money values before, the VAT rounding one took a week to unwind because it was copied into three services and nobody remembered all of them."],
+        ['kemi.a', '2d ago', "Fair. Can I do it as a follow-up? I'd like the flow merged before quarter close."],
+        ['dayo.b', '1d ago', "Fine by me if there's a ticket."]] },
+      { id: 't2', status: 'Open', loc: 'approvals/service.py:39', gist: 'Delegated approvers could approve their own orders', comments: [
+        ['funmi.o', '20h ago', "What about delegated approvers? When someone is on leave, their approvals get routed to a delegate. If the creator is themselves a delegate for the approver, they could end up approving their own order through the delegation path. I don't think we need to solve all of delegation in this PR, but we should check whether delegation applies to finance_approver at all. I believe it was added for the expense flow last year and may apply here automatically, in which case the self-approval check is easy to get around.", true]] },
+      { id: 't3', status: 'Resolved', loc: 'orders/services.py:21', gist: 'nit: rename decision → approval_decision', comments: [
+        ['dayo.b', '3d ago', 'nit: approval_decision reads clearer here.'], ['kemi.a', '3d ago', 'Done.']] },
+      { id: 't4', status: 'Resolved', loc: 'tests/test_policy.py', gist: 'Add a test for exactly €10,000', comments: [
+        ['funmi.o', '3d ago', 'Can we pin the boundary with a test at exactly €10,000?'], ['kemi.a', '2d ago', 'Added in 3f2a91c.']] }
+    ];
+    var suggestion = codeBlock('approvals/service.py', 39, [['del', '    if approver.id == order.created_by:'], ['add', '    if approver.id in {order.created_by, *delegates_of(order.created_by)}:']], null);
+    var threads = threadData.map(function (t) {
+      var open = !!s.threadsOpen[t.id];
+      var isOpen = t.status === 'Open';
+      return {
+        status: t.status, loc: t.loc, gist: t.gist, open: open,
+        countLabel: t.comments.length + (t.comments.length === 1 ? ' comment' : ' comments'),
+        boxStyle: 'border-radius: 9px; ' + (isOpen ? 'border: 1px solid #d4d4d4;' : 'border: 1px solid #f0f0f0; background: #fcfcfc;'),
+        statusStyle: 'font-size: 11px; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; width: 70px; text-align: center; box-sizing: border-box; ' + (isOpen ? 'background: #0a0a0a; color: #ffffff;' : 'border: 1px solid #e5e5e5; color: #737373;'),
+        toggle: function () { var o = Object.assign({}, self.state.threadsOpen); o[t.id] = !open; self.setState({ threadsOpen: o }); },
+        comments: t.comments.map(function (c, ci) {
+          var key = t.id + ci;
+          var long = c[2].length > 200;
+          var expanded = !!s.moreC[key];
+          return {
+            author: '@' + c[0], when: c[1], text: c[2], initial: c[0].charAt(0).toUpperCase(),
+            long: long, moreLabel: expanded ? 'Show less' : 'Show more',
+            textStyle: 'margin: 0; font-size: 13.5px; color: #262626; max-width: 720px; ' + (long && !expanded ? 'display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;' : ''),
+            toggle: function () { var m = Object.assign({}, self.state.moreC); m[key] = !expanded; self.setState({ moreC: m }); },
+            hasCode: !!c[3], code: suggestion
+          };
+        })
+      };
+    });
+
+    var doAsk = function (text) {
+      var q = (text || '').trim();
+      if (!q) return;
+      self.setState({ asked: [self.answerFor(q)].concat(self.state.asked), draft: '' });
+    };
+    var asked = s.asked.map(function (a) {
+      return { q: a.q, meta: a.meta, paras: a.paras.map(function (p) { return { text: p }; }), hasCode: !!a.code, code: a.code || { file: '', stat: '', lines: [] }, refs: a.refs.map(function (r) { return { label: r }; }) };
+    });
+    var suggestions = ['Which tests cover the new flow?', 'Where is the €10k threshold defined?', 'Can bulk imports skip approval?'].map(function (t) { return { text: t, pick: function () { doAsk(t); } }; });
+
+    var chipBtn = function (active) { return 'height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; cursor: pointer; ' + (active ? 'background: #0a0a0a; color: #ffffff; border: 1px solid #0a0a0a;' : 'background: #ffffff; color: #0a0a0a; border: 1px solid #e5e5e5;'); };
+    var entries = [['orders', 'POST /orders'], ['approve', 'POST /orders/:id/approve'], ['bulk', 'BulkImportJob']].map(function (e) {
+      return { label: e[1], style: chipBtn(s.entry === e[0]) + ' ' + MONO + 'font-size: 12px;', pick: set({ entry: e[0], step: 0 }) };
+    });
+    var totals = [[9999, '€9,999'], [10000, '€10,000'], [25000, '€25,000']].map(function (t) { return { label: t[1], style: chipBtn(s.total === t[0]), pick: set({ total: t[0] }) }; });
+
+    var ids = this.path();
+    var step = Math.min(s.step, ids.length - 1);
+    var blocks = ids.map(function (id, i) {
+      var d = defs[id], current = i === step, chip = self.chipFor(d.change, current);
+      return {
+        name: d.name, kind: d.kind, num: String(i + 1), chip: chip.text, chipStyle: chip.style,
+        style: self.boxStyle(d.change, current),
+        kindStyle: 'font-size: 11px; ' + (current ? 'color: #d4d4d4;' : 'color: #737373;'),
+        notLast: i < ids.length - 1, pick: set({ step: i })
+      };
+    });
+    var cur = defs[ids[step]];
+    var curNote = cur.note;
+    if (ids[step] === 'policy') {
+      if (s.total > 10000) curNote = 'Total is €25,000, above the threshold, so it returns REQUIRES_APPROVAL and the order goes to pending.';
+      else if (s.total === 10000) curNote = 'Boundary case: exactly €10,000 is not greater than €10,000, so this order skips approval. That matches "over €10k" in the description, but it is worth confirming with the author.';
+      else curNote = 'Total is €9,999, under the threshold, so it returns OK and the order is confirmed as before.';
+    }
+    var curChipObj = this.chipFor(cur.change, false);
+    var hasDecision = !!cur.decision;
+    var yesTaken = ids[step] === 'policy' && s.total > 10000;
+    var branch = function (taken) { return MONO + 'font-size: 12px; padding: 6px 12px; border-radius: 6px; ' + (taken ? 'background: #0a0a0a; color: #ffffff; border: 1px solid #0a0a0a;' : 'border: 1px solid #e5e5e5; color: #737373;'); };
+    var walkCode = cur.code ? codeBlock(cur.code[0], cur.code[1], cur.code[2], cur.code[3]) : { file: '', stat: '', lines: [] };
+
+    var fdData = [
+      { id: 'f1', sev: 'Blocking', title: 'Bulk imports bypass the approval check', loc: 'jobs/bulk_import.py:57', line: '57',
+        why: 'BulkImportJob writes through OrderRepository.insert_many, which hard-codes CONFIRMED. Imported orders over €10,000 are confirmed and charged with no approval, which contradicts the PR description.',
+        code: codeBlock('jobs/bulk_import.py', 53, [['ctx', 'def run(self):'], ['ctx', '    rows = self.portal.fetch_csv()'], ['ctx', '    valid = [r for r in rows if r.is_valid()]'], ['ctx', '    log.info("importing %d orders", len(valid))'], ['ctx', '    OrderRepository().insert_many(valid)'], ['ctx', '    for row in valid:'], ['ctx', '        events.emit("order.created", row.order_id)']], 57),
+        draft: 'This path skips ApprovalPolicy, so imported orders over €10k are confirmed and charged without approval. Could insert_many go through OrderService.create, or apply the policy per row before saving?' },
+      { id: 'f2', sev: 'Should fix', title: 'Failed approver emails are dropped', loc: 'approvals/notify.py:19', line: '19',
+        why: 'A mailer error is logged and swallowed. The order then sits in PENDING_APPROVAL with nobody told, and the customer waits indefinitely.',
+        code: codeBlock('approvals/notify.py', 14, [['add', 'def notify_approvers(order):'], ['add', '    approvers = User.objects.with_role("finance_approver")'], ['add', '    for user in approvers:'], ['add', '        try:'], ['add', '            mailer.send(user.email, approval_email(order))'], ['add', '        except MailerError:'], ['add', '            log.warning("approval email failed", order=order.id)']], 19),
+        draft: 'If every send fails, this order is stuck with nobody notified. Suggest retrying via the task queue and surfacing stale pending orders in the approvals inbox.' },
+      { id: 'f3', sev: 'Nit', title: 'Threshold is a hard-coded constant', loc: 'orders/policies.py:1', line: '1',
+        why: 'Already raised in the discussion and agreed as a follow-up. Worth linking the ticket so it is not lost.',
+        code: codeBlock('orders/policies.py', 1, [['add', 'THRESHOLD = Money("10000.00", "EUR")'], ['add', ''], ['add', 'class ApprovalPolicy:']], 1),
+        draft: 'Agreed to handle in a follow-up. Could you link the ticket here?' }
+    ];
+    var sevStyle = function (sev) {
+      var b = 'font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 4px; flex-shrink: 0; ';
+      return sev === 'Blocking' ? b + 'background: #0a0a0a; color: #ffffff;' : sev === 'Should fix' ? b + 'border: 1px solid #0a0a0a;' : b + 'border: 1px solid #e5e5e5; color: #525252;';
+    };
+    var includedCount = 0;
+    var findings = fdData.map(function (f) {
+      var inc = !!s.include[f.id];
+      if (inc) includedCount++;
+      return {
+        sev: f.sev, title: f.title, loc: f.loc, line: f.line, why: f.why, code: f.code,
+        sevStyle: sevStyle(f.sev), included: inc, inputId: 'c-' + f.id,
+        boxStyle: 'border: 1px solid #e5e5e5; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; ' + (inc ? '' : 'opacity: 0.5;'),
+        draft: s.drafts[f.id] != null ? s.drafts[f.id] : f.draft,
+        onDraft: function (e) { var d = Object.assign({}, self.state.drafts); d[f.id] = e.target.value; self.setState({ drafts: d }); },
+        toggle: function () { var x = Object.assign({}, self.state.include); x[f.id] = !inc; self.setState({ include: x }); }
+      };
+    });
+    var vLabels = { comment: 'Commented', approve: 'Approved', request: 'Changes requested' };
+    var verdicts = [['comment', 'Comment'], ['approve', 'Approve'], ['request', 'Request changes']].map(function (v) {
+      return { label: v[1], active: s.verdict === v[0], style: self.seg(s.verdict === v[0]), pick: set({ verdict: v[0] }) };
+    });
+
+    var providers = [['claude', 'Claude Code'], ['codex', 'Codex']].map(function (p) {
+      return { label: p[1], active: s.provider === p[0], style: self.seg(s.provider === p[0]), pick: set({ provider: p[0] }) };
+    });
+    var togDefs = [
+      ['questions', 'Generate comprehension questions', 'Adds “Can you answer these?” to every Gist.'],
+      ['showUnchanged', 'Show unchanged blocks in walkthroughs', 'Turn off to step only through what this PR touches.'],
+      ['autoRun', 'Run AI review when a session opens', 'Uses your subscription on every PR you open.']
+    ];
+    var toggles = togDefs.map(function (t) {
+      var on = !!s.opts[t[0]];
+      return {
+        label: t[1], help: t[2], on: on,
+        trackStyle: 'width: 40px; height: 24px; border-radius: 999px; display: flex; align-items: center; padding: 3px; box-sizing: border-box; transition: background 120ms; ' + (on ? 'background: #0a0a0a; justify-content: flex-end;' : 'background: #d4d4d4; justify-content: flex-start;'),
+        knobStyle: 'width: 18px; height: 18px; border-radius: 50%; background: #ffffff;',
+        toggle: function () { var o = Object.assign({}, self.state.opts); o[t[0]] = !on; self.setState({ opts: o }); }
+      };
+    });
+    var hops = [1, 2, 3].map(function (h) { return { label: h + (h === 1 ? ' hop' : ' hops'), active: s.hopsN === h, style: self.seg(s.hopsN === h), pick: set({ hopsN: h }) }; });
+    var hosts = [['GitHub', 'Connected as @tobi', 'Disconnect', false], ['GitLab', 'Not connected', 'Connect', true], ['Bitbucket', 'Not connected', 'Connect', true]].map(function (h) {
+      return { name: h[0], status: h[1], action: h[2], btnStyle: 'height: 36px; padding: 0 14px; border-radius: 8px; font-size: 13px; cursor: pointer; ' + (h[3] ? 'background: #0a0a0a; color: #ffffff; border: 1px solid #0a0a0a;' : 'background: #ffffff; color: #0a0a0a; border: 1px solid #e5e5e5;') };
+    });
+    var repos = [['orders-api', '~/code/acme/orders-api', 'Python'], ['payments-service', '~/code/acme/payments', 'Python'], ['web-dashboard', '~/code/acme/web', 'TypeScript']].map(function (r) { return { name: r[0], path: r[1], lang: r[2] }; });
+    var provLabel = { claude: 'Runs on your Claude Code subscription', codex: 'Runs on your Codex subscription' };
+    var agents = { claude: { name: 'Claude Code', path: '~/.local/bin/claude', cmd: 'claude -p (headless, read-only tools)' }, codex: { name: 'Codex', path: '/opt/homebrew/bin/codex', cmd: 'codex exec (read-only sandbox)' } };
+
+    return {
+      folders: folders, isPR: s.view === 'pr', isSettings: s.view === 'settings',
+      openSettings: set({ view: 'settings' }),
+      settingsBtnStyle: 'height: 42px; padding: 0 12px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; color: #0a0a0a; text-align: left; ' + (s.view === 'settings' ? 'background: #ffffff; border: 1px solid #e5e5e5; font-weight: 500;' : 'background: transparent; border: 1px solid transparent;'),
+      tabs: tabs, isGist: s.tab === 'gist', isWalk: s.tab === 'walk', isReview: s.tab === 'review',
+      descOpen: s.descOpen, descClosed: !s.descOpen, descLabel: s.descOpen ? 'Collapse description' : 'Read full description',
+      toggleDesc: set({ descOpen: !s.descOpen }),
+      goBulk: set({ tab: 'walk', entry: 'bulk', step: 1 }),
+      affected: affected, questions: questions, showQuestions: !!s.opts.questions,
+      answeredLabel: Object.keys(s.seen).length + ' of ' + qs.length + ' checked',
+      discOpen: s.discOpen, toggleDisc: set({ discOpen: !s.discOpen }),
+      discChevStyle: 'flex-shrink: 0; transition: transform 120ms; transform: rotate(' + (s.discOpen ? 90 : 0) + 'deg);',
+      threads: threads,
+      draft: s.draft, onDraft: function (e) { self.setState({ draft: e.target.value }); },
+      onAskKey: function (e) { if (e.key === 'Enter') doAsk(self.state.draft); },
+      ask: function () { doAsk(self.state.draft); },
+      suggestions: suggestions, asked: asked,
+      entries: entries, totals: totals, showWhatIf: s.entry === 'orders',
+      blocks: blocks, cur: cur, curNote: curNote, stepNum: String(step + 1), stepCount: String(ids.length),
+      curChip: curChipObj.text, curChipStyle: curChipObj.style,
+      hasDecision: hasDecision, yesStyle: branch(hasDecision && yesTaken), noStyle: branch(hasDecision && ids[step] === 'policy' && !yesTaken),
+      showCodeBlock: s.showCode && !!cur.code, showNoCode: s.showCode && !cur.code, walkCode: walkCode,
+      codeLabel: s.showCode ? 'Hide code' : 'Show code',
+      prev: function () { self.setState({ step: Math.max(0, step - 1) }); },
+      next: function () { self.setState({ step: Math.min(ids.length - 1, step + 1) }); },
+      toggleCode: set({ showCode: !s.showCode }),
+      reviewIdle: s.review === 'idle', reviewDone: s.review !== 'idle',
+      runReview: set({ review: 'done' }), findings: findings, verdicts: verdicts,
+      summary: s.summary, onSummary: function (e) { self.setState({ summary: e.target.value }); },
+      postLabel: 'Post review · ' + includedCount + ' comments',
+      post: set({ review: 'posted' }), isPosted: s.review === 'posted', notPosted: s.review !== 'posted',
+      verdictLabel: vLabels[s.verdict], includedCount: String(includedCount),
+      prompt: s.prompt, onPrompt: function (e) { self.setState({ prompt: e.target.value }); }, resetPrompt: set({ prompt: DEFAULT_PROMPT }),
+      providerLabel: provLabel[s.provider],
+      providers: providers, agent: agents[s.provider],
+      toggles: toggles, hops: hops, hosts: hosts, repos: repos
+    };
+  }
+}
+</script>
+</body>
+</html>

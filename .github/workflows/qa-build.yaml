@@ -1,0 +1,106 @@
+name: QA Build
+
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - main
+        paths-ignore:
+            - "server/**"
+            - "web/**"
+            - "docs/**"
+            - "*.md"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        strategy:
+            fail-fast: false
+            matrix:
+                architecture:
+                    - aarch64-apple-darwin
+                    - x86_64-apple-darwin
+
+        runs-on: macos-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "pnpm"
+
+            - name: Install stable Rust toolchain
+              uses: actions-rust-lang/setup-rust-toolchain@v1
+              with:
+                  toolchain: stable
+                  cache: true
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Check formatting
+              run: pnpm format:check
+
+            - name: Run ESLint
+              run: pnpm lint
+
+            - name: Build Tauri binaries for ${{ matrix.architecture }}
+              run: |
+                  rustup target add ${{ matrix.architecture }}
+                  pnpm tauri build --target ${{ matrix.architecture }} --config src-tauri/tauri.qa.conf.json
+              env:
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+                  APPLE_ID: ${{ secrets.APPLE_ID }}
+                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+            - name: Upload build artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: qa-artifacts-${{ matrix.architecture }}
+                  path: |
+                      src-tauri/target/${{ matrix.architecture }}/release/bundle/dmg/*.dmg
+                      src-tauri/target/${{ matrix.architecture }}/release/bundle/macos/*.app.tar.gz
+                      src-tauri/target/${{ matrix.architecture }}/release/bundle/macos/*.app.tar.gz.sig
+
+    publish:
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+                  merge-multiple: true
+
+            - name: Update nightly pre-release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: nightly
+                  name: Nightly Build
+                  prerelease: true
+                  draft: false
+                  body: |
+                      Automated QA build from `main` branch.
+                      Commit: ${{ github.sha }}
+                  files: |
+                      artifacts/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+                      artifacts/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
