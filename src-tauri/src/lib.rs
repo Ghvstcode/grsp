@@ -1,14 +1,6 @@
-#![allow(unexpected_cfgs)]
-
-#[cfg(target_os = "macos")]
-#[macro_use]
-extern crate objc;
-
 use tauri::{Emitter, Manager};
 
 pub mod agent;
-mod auth;
-mod command;
 mod commands;
 pub mod db;
 pub mod git;
@@ -17,8 +9,6 @@ mod menu;
 pub mod migrations;
 pub mod model;
 pub mod pipelines;
-mod preflight;
-mod repository;
 pub mod verify;
 
 const DB_URL: &str = "sqlite:grsp.db";
@@ -28,7 +18,6 @@ pub fn run() {
     let migrations = migrations::migrations();
 
     tauri::Builder::default()
-        .manage(commands::AppState::new())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(
@@ -48,6 +37,17 @@ pub fn run() {
             let handle = app.handle();
             let menu = menu::build_menu(handle)?;
             app.set_menu(menu)?;
+
+            // grsp engine state. Work left running by a previous process is
+            // reset and old worktrees are pruned off the main thread.
+            let state = commands::AppState::init(handle)?;
+            let engine = state.engine.clone();
+            app.manage(state);
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(e) = engine.startup() {
+                    log::warn!("startup cleanup failed: {e}");
+                }
+            });
             Ok(())
         })
         .on_window_event(|_window, event| {
@@ -73,25 +73,30 @@ pub fn run() {
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
-            command::greet,
-            command::open_in_app,
-            command::set_dock_badge,
-            auth::generate_auth_id,
-            preflight::check_git_installed,
-            preflight::check_claude_installed,
-            preflight::check_claude_authenticated,
-            preflight::check_gh_installed,
-            repository::validate_git_repo,
-            repository::generate_repo_id,
-            repository::get_repo_default_branch,
-            repository::clone_repository,
-            repository::git_pull,
-            repository::get_default_clone_dir,
-            repository::list_directory,
-            repository::read_file_content,
-            // grsp commands (src/commands.rs) are registered below by the
-            // pipelines owner. Keep this list in sync with
+            // grsp commands. Keep this list in sync with
             // src/core/types/grsp.ts → GrspCommands.
+            commands::agent_detect,
+            commands::agent_recheck,
+            commands::github_status,
+            commands::github_list_open_prs,
+            commands::repo_inspect,
+            commands::repo_list_branches,
+            commands::session_create,
+            commands::session_list,
+            commands::session_get,
+            commands::session_open,
+            commands::session_refresh,
+            commands::session_archive,
+            commands::analysis_list,
+            commands::analysis_run,
+            commands::analysis_cancel,
+            commands::question_set_opened,
+            commands::ask_list,
+            commands::ask_send,
+            commands::ask_cancel,
+            commands::excerpt_read,
+            commands::review_update_finding,
+            commands::review_post,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

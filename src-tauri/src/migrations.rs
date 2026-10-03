@@ -4,11 +4,10 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 // -- NEVER MAKE A CHANGE TO A PREVIOUS MIGRATION!!!
 
 pub fn migrations() -> Vec<Migration> {
-    vec![
-        Migration {
-            version: 1,
-            description: "create initial tables",
-            sql: r#"
+    vec![Migration {
+        version: 1,
+        description: "create initial tables",
+        sql: r#"
             CREATE TABLE IF NOT EXISTS app_metadata (
                 key TEXT PRIMARY KEY NOT NULL,
                 value TEXT NOT NULL
@@ -122,7 +121,6 @@ pub fn migrations() -> Vec<Migration> {
             CREATE INDEX IF NOT EXISTS idx_ask_session ON ask_messages(session_id);
             CREATE INDEX IF NOT EXISTS idx_findings_session ON findings(session_id);
         "#,
-            kind: MigrationKind::Up,
-        },
-    ]
+        kind: MigrationKind::Up,
+    }]
 }
