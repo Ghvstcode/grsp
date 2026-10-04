@@ -7,7 +7,7 @@
 <h1 align="center">grsp</h1>
 
 <p align="center">
-  <b>Stop reading diffs. Understand the change.</b>
+  <b>Review code without reading diffs.</b>
 </p>
 
 <p align="center">

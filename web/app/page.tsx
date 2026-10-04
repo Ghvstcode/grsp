@@ -113,10 +113,10 @@ export default function Home() {
                             <Eyebrow>Pull requests · macOS</Eyebrow>
                         </div>
                         <h1 className="mt-6 text-[clamp(2.6rem,6.2vw,4.9rem)] font-bold tracking-[-0.045em] leading-[0.98] animate-fade-in-up delay-75">
-                            Stop reading diffs.
+                            Review code
                             <br />
                             <span className="text-text-3">
-                                Understand the change.
+                                without reading diffs.
                             </span>
                         </h1>
                         <p className="mt-7 max-w-[30rem] text-lg leading-relaxed text-text-2 animate-fade-in-up delay-150">
@@ -125,7 +125,7 @@ export default function Home() {
                             really changes, the paths it forgot, and whether the
                             description is true.
                         </p>
-                        <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-4 animate-fade-in-up delay-200">
+                        <div className="relative z-20 mt-9 flex flex-wrap items-center gap-x-6 gap-y-4 animate-fade-in-up delay-200">
                             <DownloadDropdown
                                 align="left"
                                 className="bg-ink text-white pl-6 pr-5 py-3.5 rounded-full font-medium hover:bg-black/80 transition-colors inline-flex items-center gap-2.5"

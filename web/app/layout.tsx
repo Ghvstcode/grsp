@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
     variable: "--font-mono",
 });
 
-const title = "grsp — Stop reading diffs. Understand the change.";
+const title = "grsp — Review code without reading diffs.";
 const description =
     "A macOS app for understanding pull requests. See what a PR actually does, step through the changed behaviour, and review with confidence — on the Claude Code or Codex subscription you already have.";
 
