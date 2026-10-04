@@ -17,26 +17,49 @@ const TINY: Dot[] = [
     [80, 60, 31],
 ];
 
-/** The grsp mark: a field of dots with one grown large. */
+/**
+ * The grsp mark: a field of dots with one grown large. `animated` plays the
+ * intro once an ancestor is `.revealed` (wrap it in <Reveal>).
+ */
 export function Logo({
     size = 20,
     className = "",
+    animated = false,
 }: {
     size?: number;
     className?: string;
+    animated?: boolean;
 }) {
-    const dots = size < 20 ? TINY : size < 48 ? SMALL : REGULAR;
+    const dots = animated
+        ? REGULAR
+        : size < 20
+          ? TINY
+          : size < 48
+            ? SMALL
+            : REGULAR;
+    const bigRadius = Math.max(...dots.map(([, , r]) => r));
     return (
         <svg
             width={size}
             height={size}
             viewBox="0 0 120 120"
             fill="currentColor"
-            className={className}
+            className={`overflow-visible ${animated ? "grsp-mark-animated" : ""} ${className}`}
             aria-hidden="true"
         >
-            {dots.map(([cx, cy, r]) => (
-                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+            {dots.map(([cx, cy, r], i) => (
+                <circle
+                    key={`${cx}-${cy}`}
+                    cx={cx}
+                    cy={cy}
+                    r={r}
+                    data-big={r === bigRadius ? "" : undefined}
+                    style={
+                        animated
+                            ? ({ "--i": i } as React.CSSProperties)
+                            : undefined
+                    }
+                />
             ))}
         </svg>
     );
