@@ -1,3 +1,4 @@
+import { metrics } from "@core/services/metrics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSettings, updateSetting } from "@core/db/settings";
 import type { SettingUpdate } from "@core/db/settings-codec";
@@ -27,6 +28,7 @@ export function useUpdateSetting() {
             );
         },
         onSuccess: (_data, variables) => {
+            metrics.track("settings_changed", { setting: variables.key });
             if (!variables.silent) savedToast();
         },
         onSettled: () => {

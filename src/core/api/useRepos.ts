@@ -1,3 +1,4 @@
+import { metrics } from "@core/services/metrics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { call } from "@core/services/client";
 import {
@@ -22,6 +23,7 @@ export function useAddRepo() {
     return useMutation({
         mutationFn: ({ path }: { path: string }) => addRepo(path),
         onSuccess: () => {
+            metrics.track("repo_added", { via: "folder" });
             void queryClient.invalidateQueries({ queryKey: ["repos"] });
         },
     });
@@ -43,6 +45,7 @@ export function useCloneRepo() {
             return addRepo(path);
         },
         onSuccess: () => {
+            metrics.track("repo_added", { via: "clone" });
             void queryClient.invalidateQueries({ queryKey: ["repos"] });
         },
     });

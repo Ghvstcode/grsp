@@ -1,3 +1,7 @@
+import { onGrspEvent } from "@core/services/client";
+import { metrics, metricKind } from "@core/services/metrics";
+import { startSessionTracking } from "@core/services/session-tracker";
+import { GRSP_EVENTS, type AnalysisEvent } from "@core/types/grsp";
 import { useCallback, useRef, useEffect } from "react";
 import { Sidebar } from "@ui/components/sidebar/Sidebar";
 import { MainContent } from "@ui/components/main/MainContent";
@@ -8,6 +12,19 @@ import { useAppStore } from "@core/store/app-store";
 
 export function AppShell() {
     useAuth();
+
+    // Usage metrics: app session length and which pipelines finish.
+    useEffect(() => {
+        startSessionTracking();
+        return onGrspEvent<AnalysisEvent>(GRSP_EVENTS.analysis, (event) => {
+            if (event.status === "done" || event.status === "error") {
+                metrics.track("analysis_completed", {
+                    kind: metricKind(event.kind),
+                    status: event.status,
+                });
+            }
+        });
+    }, []);
 
     const sidebarWidth = useAppStore((s) => s.sidebarWidth);
     const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);

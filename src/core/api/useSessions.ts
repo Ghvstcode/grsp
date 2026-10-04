@@ -1,3 +1,4 @@
+import { metrics } from "@core/services/metrics";
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { call, onGrspEvent } from "@core/services/client";
@@ -36,7 +37,8 @@ export function useCreateSession() {
     return useMutation({
         mutationFn: (input: NewSessionInput) =>
             call("session_create", { input }),
-        onSuccess: (session) => {
+        onSuccess: (session, input) => {
+            metrics.track("review_session_created", { source: input.kind });
             // Put the session in the list before selecting it; MainContent
             // drops a selection that isn't in the list.
             queryClient.setQueryData<ReviewSession[]>(["sessions"], (list) =>

@@ -1,3 +1,4 @@
+import { metrics } from "@core/services/metrics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isOnboardingComplete, setOnboardingComplete } from "@core/db/metadata";
 
@@ -14,6 +15,7 @@ export function useCompleteOnboarding() {
     return useMutation({
         mutationFn: setOnboardingComplete,
         onSuccess: () => {
+            metrics.track("onboarding_completed");
             queryClient.setQueryData(["onboarding-status"], true);
         },
     });

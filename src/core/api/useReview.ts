@@ -1,3 +1,4 @@
+import { metrics } from "@core/services/metrics";
 import { useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call } from "@core/services/client";
@@ -107,6 +108,7 @@ export function useReview(sessionId: string) {
             return call("review_post", { sessionId, input });
         },
         onSuccess: (postedReview: PostedReview) => {
+            metrics.track("review_posted", { event: postedReview.event });
             queryClient.setQueryData<ReviewSession>(
                 sessionKeys.session(sessionId),
                 (session) => (session ? { ...session, postedReview } : session),

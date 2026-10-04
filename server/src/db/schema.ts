@@ -14,9 +14,8 @@ export const metricEvents = sqliteTable(
     "metric_events",
     {
         id: integer("id").primaryKey({ autoIncrement: true }),
-        userId: integer("user_id")
-            .notNull()
-            .references(() => users.id),
+        userId: integer("user_id").references(() => users.id),
+        installId: text("install_id"),
         eventType: text("event_type").notNull(),
         eventData: text("event_data"),
         clientTimestamp: text("client_timestamp").notNull(),
@@ -24,6 +23,10 @@ export const metricEvents = sqliteTable(
     },
     (table) => [
         index("idx_metric_events_user_type").on(table.userId, table.eventType),
+        index("idx_metric_events_install_type").on(
+            table.installId,
+            table.eventType,
+        ),
         index("idx_metric_events_created").on(table.createdAt),
     ],
 );

@@ -1394,9 +1394,13 @@ change, not just what is wrong.`}
                             </li>
                             <li>
                                 <strong>grsp&apos;s own server</strong> handles
-                                sign-in and anonymous product metrics (which
-                                features are used, never repository names, code,
-                                diffs, prompts or agent output).
+                                sign-in and anonymous usage metrics: which
+                                features are used and whether analyses finish,
+                                tagged with a random install id (and your grsp
+                                account if you signed in). Never repository
+                                names, code, diffs, PR titles, questions,
+                                comments or agent output. Turn it off in
+                                Settings → General.
                             </li>
                         </ul>
                     </section>

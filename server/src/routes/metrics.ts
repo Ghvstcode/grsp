@@ -13,48 +13,80 @@ interface MetricEvent {
     clientTimestamp: string;
 }
 
+const INSTALL_ID =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EVENT_TYPE = /^[a-z][a-z0-9_]{0,47}$/;
+const MAX_EVENT_DATA_CHARS = 2000;
+
+function isValidEvent(e: unknown): e is MetricEvent {
+    if (typeof e !== "object" || e === null) return false;
+    const event = e as Partial<MetricEvent>;
+    return (
+        typeof event.eventType === "string" &&
+        EVENT_TYPE.test(event.eventType) &&
+        typeof event.clientTimestamp === "string" &&
+        !Number.isNaN(new Date(event.clientTimestamp).getTime())
+    );
+}
+
+/**
+ * Usage events from the desktop app. Every batch carries an anonymous install
+ * id; a signed-in app also sends its GitHub token so events can be tied to
+ * the account. Either one is enough.
+ */
 metrics.post("/metrics/events", async (c) => {
-    const authHeader = c.req.header("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-        return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const db = createDb(c.env.DB);
-    const token = authHeader.slice(7);
-
-    // Resolve user from token
-    let userId: number | null = null;
-    try {
-        const ghUser = await fetchGitHubUser(token);
-        const rows = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(eq(users.githubId, ghUser.id))
-            .limit(1);
-        userId = rows.length > 0 ? rows[0].id : null;
-    } catch {
-        userId = null;
-    }
-
-    if (!userId) {
-        return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const body = await c.req.json<{ events: MetricEvent[] }>();
-    if (!Array.isArray(body.events) || body.events.length === 0) {
+    const body = await c.req
+        .json<{ installId?: unknown; events?: unknown }>()
+        .catch(() => undefined);
+    if (!body || !Array.isArray(body.events) || body.events.length === 0) {
         return c.json({ error: "No events provided" }, 400);
     }
 
-    // Cap batch size
-    const events = body.events.slice(0, 100);
+    const installId =
+        typeof body.installId === "string" && INSTALL_ID.test(body.installId)
+            ? body.installId.toLowerCase()
+            : null;
+
+    const db = createDb(c.env.DB);
+
+    let userId: number | null = null;
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+        try {
+            const ghUser = await fetchGitHubUser(authHeader.slice(7));
+            const rows = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.githubId, ghUser.id))
+                .limit(1);
+            userId = rows.length > 0 ? rows[0].id : null;
+        } catch {
+            userId = null;
+        }
+    }
+
+    if (!userId && !installId) {
+        return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    // Cap batch size and drop malformed events.
+    const events = body.events.slice(0, 100).filter(isValidEvent);
+    if (events.length === 0) {
+        return c.json({ error: "No valid events provided" }, 400);
+    }
 
     await db.insert(metricEvents).values(
-        events.map((e) => ({
-            userId,
-            eventType: e.eventType,
-            eventData: e.eventData ? JSON.stringify(e.eventData) : null,
-            clientTimestamp: new Date(e.clientTimestamp).toISOString(),
-        })),
+        events.map((e) => {
+            const data = e.eventData ? JSON.stringify(e.eventData) : null;
+            return {
+                userId,
+                installId,
+                eventType: e.eventType,
+                eventData:
+                    data && data.length <= MAX_EVENT_DATA_CHARS ? data : null,
+                clientTimestamp: new Date(e.clientTimestamp).toISOString(),
+            };
+        }),
     );
 
     return c.json({ accepted: events.length });

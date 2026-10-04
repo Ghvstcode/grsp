@@ -1,3 +1,4 @@
+import { metrics } from "@core/services/metrics";
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call, onGrspEvent } from "@core/services/client";
@@ -54,6 +55,7 @@ export function useAsk(sessionId: string) {
         mutationFn: (question: string) =>
             call("ask_send", { sessionId, question }),
         onSuccess: (message) => {
+            metrics.track("ask_sent");
             queryClient.setQueryData<AskMessage[]>(key, (messages = []) =>
                 messages.some((m) => m.id === message.id)
                     ? messages
