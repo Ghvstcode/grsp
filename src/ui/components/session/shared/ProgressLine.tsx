@@ -1,4 +1,5 @@
 import { cn } from "@ui/lib/utils";
+import { DotLoader } from "@ui/components/DotLoader";
 
 /** The agent's current activity ("Reading orders/services.py"). */
 export function ProgressLine({
@@ -15,7 +16,7 @@ export function ProgressLine({
             className={cn("flex min-h-6 items-center gap-2.5", className)}
             aria-live="polite"
         >
-            <span className="grsp-progress-dot" aria-hidden />
+            <DotLoader />
             <span className="grsp-text-2 min-w-0 truncate font-mono text-xs">
                 {text}
             </span>

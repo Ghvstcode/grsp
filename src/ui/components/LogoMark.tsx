@@ -3,6 +3,11 @@ import { cn } from "@ui/lib/utils";
 interface LogoMarkProps {
     size?: number;
     className?: string;
+    /**
+     * Plays the intro: the dots arrive, a scan passes over them, and the one
+     * that matters grows. Always draws the full grid.
+     */
+    animated?: boolean;
 }
 
 type Dot = readonly [cx: number, cy: number, r: number];
@@ -37,7 +42,15 @@ function dotsFor(size: number): Dot[] {
  * The grsp mark: a field of dots with one grown large. Nine changes, one of
  * them matters.
  */
-export function LogoMark({ size = 16, className }: LogoMarkProps) {
+export function LogoMark({
+    size = 16,
+    className,
+    animated = false,
+}: LogoMarkProps) {
+    const dots = animated ? REGULAR : dotsFor(size);
+    // The large dot has the largest radius in every optical size.
+    const bigRadius = Math.max(...dots.map(([, , r]) => r));
+
     return (
         <svg
             width={size}
@@ -45,11 +58,23 @@ export function LogoMark({ size = 16, className }: LogoMarkProps) {
             viewBox="0 0 120 120"
             fill="currentColor"
             xmlns="http://www.w3.org/2000/svg"
-            className={cn("shrink-0", className)}
+            className={cn(
+                "shrink-0 overflow-visible",
+                animated && "grsp-mark-animated",
+                className,
+            )}
             aria-hidden="true"
         >
-            {dotsFor(size).map(([cx, cy, r]) => (
-                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+            {dots.map(([cx, cy, r], i) => (
+                <circle
+                    key={`${cx}-${cy}`}
+                    cx={cx}
+                    cy={cy}
+                    r={r}
+                    data-big={r === bigRadius ? "" : undefined}
+                    // Reading order; drives the stagger in App.css.
+                    style={animated ? { ["--i" as string]: i } : undefined}
+                />
             ))}
         </svg>
     );

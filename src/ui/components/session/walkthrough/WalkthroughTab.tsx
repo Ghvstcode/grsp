@@ -96,12 +96,18 @@ function BlockChain({
                             <span className="flex min-w-0 flex-col gap-0.5">
                                 <span
                                     className={cn(
-                                        "text-[11px]",
+                                        "flex items-center gap-1.5 text-[11px]",
                                         isCurrent
                                             ? "text-background/80"
                                             : "text-muted-foreground",
                                     )}
                                 >
+                                    {isCurrent && (
+                                        <span
+                                            aria-hidden
+                                            className="h-[7px] w-[7px] rounded-full bg-background"
+                                        />
+                                    )}
                                     {step.number} · {kindLabel(step.block.kind)}
                                 </span>
                                 <span className="truncate font-mono text-[13px]">

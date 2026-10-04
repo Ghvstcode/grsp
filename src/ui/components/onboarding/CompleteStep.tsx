@@ -19,8 +19,8 @@ export function CompleteStep({
     return (
         <div className="flex flex-col items-center text-center">
             {/* Logo with pop-in animation */}
-            <div className="animate-pop-in">
-                <LogoMark size={48} />
+            <div>
+                <LogoMark size={56} animated />
             </div>
 
             <h2 className="text-2xl font-bold tracking-tight text-foreground mt-6 animate-fade-in-up delay-200">

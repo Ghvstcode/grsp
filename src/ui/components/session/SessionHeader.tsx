@@ -92,9 +92,13 @@ export function SessionHeader({
                     <span
                         className={cn(
                             pill,
-                            "border-foreground bg-foreground text-background",
+                            "inline-flex items-center gap-1.5 border-foreground bg-foreground text-background",
                         )}
                     >
+                        <span
+                            aria-hidden
+                            className="h-[7px] w-[7px] rounded-full bg-background"
+                        />
                         {plural(mismatchCount, "mismatch", "mismatches")}
                     </span>
                 )}

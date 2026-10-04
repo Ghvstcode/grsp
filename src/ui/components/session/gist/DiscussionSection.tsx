@@ -1,3 +1,4 @@
+import { DotLoader } from "@ui/components/DotLoader";
 import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type {
@@ -281,9 +282,7 @@ export function DiscussionSection({
                     {plural(counts.people, "person", "people")}
                 </span>
             )}
-            {state === "running" && (
-                <span className="grsp-progress-dot" aria-hidden />
-            )}
+            {state === "running" && <DotLoader />}
         </>
     );
     const headerClass =

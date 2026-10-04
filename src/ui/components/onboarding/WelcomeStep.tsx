@@ -11,13 +11,13 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
     return (
         <div className="flex flex-col items-center text-center gap-6">
             {/* Logo */}
-            <div className="animate-fade-in-up">
-                <LogoMark size={56} />
+            <div>
+                <LogoMark size={72} animated />
             </div>
 
             {/* Brand */}
             <h1 className="text-4xl text-foreground animate-fade-in-up delay-100">
-                <Wordmark />
+                <Wordmark animated />
             </h1>
 
             {/* Tagline */}
