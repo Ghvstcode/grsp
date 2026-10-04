@@ -4,6 +4,8 @@
  * can be exercised in a browser. Behaves like the Rust core: commands return
  * quickly, long work streams progress through events.
  */
+import { readStore } from "@core/db/browser-store";
+import type { Repo } from "@core/types/grsp";
 import {
     GRSP_EVENTS,
     type AgentStatus,
@@ -458,7 +460,12 @@ export function createFixtureBackend(
                     );
                 if (!match) reject("That doesn't look like a GitHub PR URL.");
                 const [, owner, name] = match;
-                const repo = FIXTURE_REPOS.find(
+                // Includes folders added or cloned in this browser.
+                const repo = readStore(
+                    "repos",
+                    () => FIXTURE_REPOS,
+                    (v): v is Repo[] => Array.isArray(v),
+                ).find(
                     (r) => r.remote?.owner === owner && r.remote?.name === name,
                 );
                 if (!repo) {
@@ -703,13 +710,17 @@ export function createFixtureBackend(
                 defaultBranch: "main",
                 remote: known?.remote ?? {
                     host: "github",
-                    owner: "acme",
+                    // Clones made by repo_clone live in …/repos/{owner}/{name}.
+                    owner: /\/repos\/([^/]+)\/[^/]+$/.exec(path)?.[1] ?? "acme",
                     name,
                 },
                 language: known?.language ?? "TypeScript",
             };
         },
         repo_list_branches: () => BRANCHES,
+        repo_clone: ({ owner, name }) => ({
+            path: `/Users/you/Library/Application Support/grsp/repos/${owner}/${name}`,
+        }),
 
         session_create: ({ input }) => createSession(input),
         session_list: () =>

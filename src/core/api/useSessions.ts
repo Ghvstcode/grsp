@@ -5,6 +5,7 @@ import { useAppStore } from "@core/store/app-store";
 import {
     GRSP_EVENTS,
     type NewSessionInput,
+    type ReviewSession,
     type SessionEvent,
 } from "@core/types/grsp";
 
@@ -36,6 +37,13 @@ export function useCreateSession() {
         mutationFn: (input: NewSessionInput) =>
             call("session_create", { input }),
         onSuccess: (session) => {
+            // Put the session in the list before selecting it; MainContent
+            // drops a selection that isn't in the list.
+            queryClient.setQueryData<ReviewSession[]>(["sessions"], (list) =>
+                list?.some((s) => s.id === session.id)
+                    ? list
+                    : [session, ...(list ?? [])],
+            );
             setSelectedSession(session.id);
             void queryClient.invalidateQueries({ queryKey: ["sessions"] });
         },

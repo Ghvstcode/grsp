@@ -478,6 +478,11 @@ export interface GrspCommands {
 
     repo_inspect: { args: { path: string }; result: RepoInspection };
     repo_list_branches: { args: { repoId: string }; result: BranchList };
+    /** Clones owner/name from GitHub into grsp's own folder; returns its path. */
+    repo_clone: {
+        args: { owner: string; name: string };
+        result: { path: string };
+    };
 
     session_create: { args: { input: NewSessionInput }; result: ReviewSession };
     session_list: { args: Record<string, never>; result: ReviewSession[] };

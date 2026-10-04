@@ -134,6 +134,82 @@ pub async fn repo_list_branches(
     .await
 }
 
+/// Clone `owner/name` from GitHub into grsp's own folder so a pasted PR link
+/// works without the user finding a local clone first. Reuses an earlier
+/// clone if one is already there.
+#[tauri::command]
+pub async fn repo_clone(
+    state: State<'_, AppState>,
+    owner: String,
+    name: String,
+) -> Result<ClonedRepo, String> {
+    let engine = state.engine.clone();
+    blocking(move || clone_repo(&engine.repos_dir(), &owner, &name)).await
+}
+
+#[derive(serde::Serialize)]
+pub struct ClonedRepo {
+    pub path: String,
+}
+
+fn is_safe_segment(s: &str) -> bool {
+    !s.is_empty()
+        && s != "."
+        && s != ".."
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+}
+
+fn clone_repo(repos_dir: &std::path::Path, owner: &str, name: &str) -> Result<ClonedRepo, String> {
+    if !is_safe_segment(owner) || !is_safe_segment(name) {
+        return Err(format!(
+            "\"{owner}/{name}\" isn't a valid GitHub repository."
+        ));
+    }
+    let dest = repos_dir.join(owner).join(name);
+    let path = dest.to_string_lossy().to_string();
+    if dest.is_dir() {
+        if git::inspect_repo(&path).is_git_repo {
+            return Ok(ClonedRepo { path });
+        }
+        // A half-finished clone from an earlier attempt.
+        std::fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
+    }
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let gh = github::gh_binary().ok_or_else(|| {
+        "The GitHub CLI (gh) isn't installed. Install it from https://cli.github.com and run `gh auth login`.".to_string()
+    })?;
+    // Blobless: history and trees now, file contents on demand. grsp only reads.
+    let output = std::process::Command::new(gh)
+        .args([
+            "repo",
+            "clone",
+            &format!("{owner}/{name}"),
+            &path,
+            "--",
+            "--filter=blob:none",
+        ])
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("PATH", agent::detect::child_path())
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|e| format!("Couldn't run gh: {e}"))?;
+    if !output.status.success() {
+        let _ = std::fs::remove_dir_all(&dest);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let reason = stderr
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("unknown error");
+        return Err(format!("Couldn't clone {owner}/{name}: {}", reason.trim()));
+    }
+    Ok(ClonedRepo { path })
+}
+
 // ── Sessions ───────────────────────────────────────────────
 
 #[tauri::command]

@@ -27,6 +27,27 @@ export function useAddRepo() {
     });
 }
 
+/** Clones owner/name into grsp's own folder, then adds it as a repo. */
+export function useCloneRepo() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            owner,
+            name,
+        }: {
+            owner: string;
+            name: string;
+        }) => {
+            const { path } = await call("repo_clone", { owner, name });
+            return addRepo(path);
+        },
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: ["repos"] });
+        },
+    });
+}
+
 /** Removes a folder and archives its sessions. */
 export function useRemoveRepo() {
     const queryClient = useQueryClient();

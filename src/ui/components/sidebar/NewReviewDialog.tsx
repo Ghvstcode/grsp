@@ -19,7 +19,12 @@ import {
     SelectValue,
 } from "@ui/components/ui/select";
 import { Segmented } from "@ui/components/ui/segmented";
-import { useBranches, useOpenPrs, useRepos } from "@core/api/useRepos";
+import {
+    useBranches,
+    useCloneRepo,
+    useOpenPrs,
+    useRepos,
+} from "@core/api/useRepos";
 import { useCreateSession, useSessions } from "@core/api/useSessions";
 import { useAppStore } from "@core/store/app-store";
 import type {
@@ -53,6 +58,7 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
     const { data: sessions } = useSessions();
     const selectedSessionId = useAppStore((s) => s.selectedSessionId);
     const createSession = useCreateSession();
+    const cloneRepo = useCloneRepo();
 
     const [mode, setMode] = useState<Mode>("url");
     const [url, setUrl] = useState("");
@@ -114,6 +120,20 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
             },
             onSettled: () => setPendingInput(undefined),
         });
+    }
+
+    function handleClone(target: RepoNotAddedError) {
+        setError(undefined);
+        cloneRepo.mutate(
+            { owner: target.owner, name: target.name },
+            {
+                onSuccess: (added) => {
+                    setRepoId(added.id);
+                    if (trimmedUrl) start({ kind: "url", url: trimmedUrl });
+                },
+                onError: (err: unknown) => setError(errorMessage(err)),
+            },
+        );
     }
 
     function handleModeChange(next: Mode) {
@@ -383,19 +403,38 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
                         {repoNotAdded && (
                             <div className="rounded-lg border border-dashed border-ink px-4 py-3">
                                 <p className="text-[13px]">
-                                    This PR is for{" "}
+                                    grsp doesn't have{" "}
                                     <span className="font-mono text-[12.5px]">
                                         {repoNotAdded.owner}/{repoNotAdded.name}
-                                    </span>
-                                    . Add its folder first.
+                                    </span>{" "}
+                                    yet.
                                 </p>
-                                <Button
-                                    size="sm"
-                                    className="mt-3"
-                                    onClick={() => setIsAddFolderOpen(true)}
-                                >
-                                    Add folder
-                                </Button>
+                                <p className="mt-1 text-xs text-text-3">
+                                    {cloneRepo.isPending
+                                        ? "Cloning. Large repositories can take a minute."
+                                        : "It can clone a read-only copy for you, or use a clone you already have."}
+                                </p>
+                                <div className="mt-3 flex items-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        disabled={cloneRepo.isPending}
+                                        onClick={() =>
+                                            handleClone(repoNotAdded)
+                                        }
+                                    >
+                                        {cloneRepo.isPending
+                                            ? "Cloning…"
+                                            : "Clone it"}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={cloneRepo.isPending}
+                                        onClick={() => setIsAddFolderOpen(true)}
+                                    >
+                                        I already have it
+                                    </Button>
+                                </div>
                             </div>
                         )}
 

@@ -11,6 +11,7 @@ Every judgement call made while building grsp, grouped by area. `design/SPEC.md`
 - The what-if option schema extends the SPEC's with optional per-option `taken` and `notes` maps, which the prototype's walkthrough needs to show the taken branch and per-input notes.
 - Outside Tauri, or with `VITE_GRSP_FIXTURES=1`, the frontend runs on a fixture backend lifted from the prototype.
 - All Tauri config versions were aligned to 0.1.0.
+- A pasted PR link for a repo grsp doesn't have offers to clone it (`gh repo clone`, blobless, into `{app data}/repos/{owner}/{name}`) or to pick an existing local clone, then retries the link. SPEC §2.1 only asked for "Add its folder first".
 
 ## rust-core decisions (model, db, git, verify)
 

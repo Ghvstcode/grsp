@@ -79,6 +79,11 @@ fn valid_kind(kind: &str) -> bool {
 }
 
 impl Engine {
+    /// Where grsp keeps clones it made itself: `{data_dir}/repos/{owner}/{name}`.
+    pub fn repos_dir(&self) -> PathBuf {
+        self.data_dir.join("repos")
+    }
+
     pub fn new(
         db_dir: PathBuf,
         data_dir: PathBuf,
