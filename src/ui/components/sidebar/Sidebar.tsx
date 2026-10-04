@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { FolderPlus, Plus } from "lucide-react";
 import { useAppStore } from "@core/store/app-store";
 import { LogoMark } from "@ui/components/LogoMark";
+import { Wordmark } from "@ui/components/Wordmark";
 import { SessionList } from "./SessionList";
 import { SidebarFooter } from "./SidebarFooter";
 import { AddFolderDialog } from "./AddFolderDialog";
@@ -23,10 +24,8 @@ export function Sidebar({ style }: SidebarProps) {
             {/* Brand */}
             <div className="flex h-[60px] shrink-0 items-center border-b border-border px-4">
                 <div className="flex items-center gap-2">
-                    <LogoMark size={16} className="text-sidebar-foreground" />
-                    <span className="text-[15px] font-semibold text-sidebar-foreground tracking-tight">
-                        grsp
-                    </span>
+                    <LogoMark size={18} className="text-sidebar-foreground" />
+                    <Wordmark className="text-[16px] text-sidebar-foreground" />
                 </div>
             </div>
 

@@ -1,6 +1,6 @@
 import { Reveal } from "./components/reveal";
 import { DownloadDropdown } from "./components/download-dropdown";
-import { GITHUB_URL, GitHubIcon, Logo } from "./components/logo";
+import { GITHUB_URL, GitHubIcon, Logo, Wordmark } from "./components/logo";
 import {
     GistMock,
     NewReviewMock,
@@ -113,10 +113,8 @@ export default function Home() {
             <nav className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
                 <div className="max-w-5xl mx-auto flex items-center justify-between px-6 h-[52px]">
                     <a href="/" className="flex items-center gap-2">
-                        <Logo size={16} className="animate-slow-spin" />
-                        <span className="font-semibold tracking-tight">
-                            grsp
-                        </span>
+                        <Logo size={20} />
+                        <Wordmark className="text-[1.05em]" />
                     </a>
                     <div className="flex items-center gap-6">
                         <a
@@ -162,7 +160,7 @@ export default function Home() {
                     {/* Logo */}
                     <div className="animate-fade-in-up mb-8">
                         <div className="animate-float">
-                            <Logo size={48} className="animate-slow-spin" />
+                            <Logo size={48} />
                         </div>
                     </div>
 
@@ -424,8 +422,7 @@ export default function Home() {
             <footer className="py-12 px-6 sm:px-16 border-t border-gray-100">
                 <div className="max-w-3xl mx-auto flex justify-between items-center">
                     <div className="flex items-center gap-2 text-gray-500 font-medium">
-                        <Logo size={12} className="animate-slow-spin" />©{" "}
-                        {new Date().getFullYear()} grsp
+                        <Logo size={12} />© {new Date().getFullYear()} grsp
                     </div>
                     <div className="flex gap-8 text-gray-500">
                         <a

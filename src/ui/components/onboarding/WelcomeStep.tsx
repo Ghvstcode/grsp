@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Button } from "@ui/components/ui/button";
 import { LogoMark } from "@ui/components/LogoMark";
+import { Wordmark } from "@ui/components/Wordmark";
 
 interface WelcomeStepProps {
     onNext: () => void;
@@ -11,12 +12,12 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
         <div className="flex flex-col items-center text-center gap-6">
             {/* Logo */}
             <div className="animate-fade-in-up">
-                <LogoMark size={48} className="animate-slow-spin" />
+                <LogoMark size={56} />
             </div>
 
             {/* Brand */}
-            <h1 className="text-4xl font-bold tracking-tight text-foreground animate-fade-in-up delay-100">
-                grsp
+            <h1 className="text-4xl text-foreground animate-fade-in-up delay-100">
+                <Wordmark />
             </h1>
 
             {/* Tagline */}

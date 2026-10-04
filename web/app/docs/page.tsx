@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
-import { Logo } from "../components/logo";
+import { Logo, Wordmark } from "../components/logo";
 
 /* ────────────────────────────────────────
    Types
@@ -268,10 +268,8 @@ export default function DocsPage() {
                             </svg>
                         </button>
                         <a href="/" className="flex items-center gap-2">
-                            <Logo size={16} className="animate-slow-spin" />
-                            <span className="font-semibold tracking-tight">
-                                grsp
-                            </span>
+                            <Logo size={20} />
+                            <Wordmark className="text-[1.05em]" />
                         </a>
                         <span className="text-gray-300">/</span>
                         <span className="text-sm text-gray-500 mono">docs</span>
@@ -1489,7 +1487,7 @@ change, not just what is wrong.`}
                     <div className="mt-16 pt-8 border-t border-gray-100">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-gray-400 text-sm">
-                                <Logo size={12} className="animate-slow-spin" />
+                                <Logo size={12} />
                                 <span className="mono">grsp docs</span>
                             </div>
                             <a

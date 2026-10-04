@@ -7,7 +7,7 @@
  */
 
 import { useState, type ReactNode } from "react";
-import { Logo } from "./logo";
+import { Logo, Wordmark } from "./logo";
 
 /* ─── Primitives ─── */
 
@@ -249,9 +249,7 @@ function Sidebar() {
         <aside className="hidden xl:flex w-[196px] shrink-0 flex-col gap-3 bg-panel border-r border-line p-3">
             <div className="flex items-center gap-2 px-1 pt-0.5">
                 <Logo size={14} />
-                <span className="text-[13px] font-semibold tracking-tight">
-                    grsp
-                </span>
+                <Wordmark className="text-[1.05em]" />
             </div>
             <div className="h-8 rounded-lg bg-ink text-white text-[12px] font-medium flex items-center justify-center">
                 New review

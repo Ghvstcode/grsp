@@ -13,10 +13,7 @@ export function EmptyState() {
         <div className="flex h-full flex-col items-center justify-center text-center">
             {/* Spinning logo */}
             <div className="animate-fade-in-up">
-                <LogoMark
-                    size={40}
-                    className="animate-slow-spin text-muted-foreground/30"
-                />
+                <LogoMark size={40} className="text-muted-foreground/30" />
             </div>
             <p className="mt-5 text-sm text-muted-foreground animate-fade-in-up delay-100">
                 {hasSessions

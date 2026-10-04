@@ -1,4 +1,23 @@
-/** The grsp mark: the eight-spoke asterisk. */
+type Dot = readonly [cx: number, cy: number, r: number];
+
+const grid = (positions: number[], small: number, big: number): Dot[] =>
+    positions.flatMap((cy, row) =>
+        positions.map(
+            (cx, col): Dot => [cx, cy, row === 1 && col === 2 ? big : small],
+        ),
+    );
+
+// Three optical sizes; source of truth is design/brand/build.mjs.
+const REGULAR = grid([28, 60, 92], 6.5, 17);
+const SMALL = grid([26, 60, 94], 8.5, 20);
+const TINY: Dot[] = [
+    [26, 22, 11],
+    [26, 60, 11],
+    [26, 98, 11],
+    [80, 60, 31],
+];
+
+/** The grsp mark: a field of dots with one grown large. */
 export function Logo({
     size = 20,
     className = "",
@@ -6,23 +25,38 @@ export function Logo({
     size?: number;
     className?: string;
 }) {
+    const dots = size < 20 ? TINY : size < 48 ? SMALL : REGULAR;
     return (
         <svg
             width={size}
             height={size}
-            viewBox="0 0 42 42"
-            fill="none"
+            viewBox="0 0 120 120"
+            fill="currentColor"
             className={className}
             aria-hidden="true"
         >
-            <path
-                d="M24.3012 1.73511V19.0934M24.3012 36.4518V19.0934M36.5754 6.81925L12.027 31.3676M24.3012 19.0934L6.94287 19.0934M36.5754 31.3676L12.027 6.81925"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
+            {dots.map(([cx, cy, r]) => (
+                <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+            ))}
         </svg>
+    );
+}
+
+/** The wordmark: the dropped "a" is a solid dot. Sized by font-size. */
+export function Wordmark({ className = "" }: { className?: string }) {
+    return (
+        <span
+            role="img"
+            aria-label="grsp"
+            className={`inline-flex items-baseline font-bold tracking-[-0.05em] ${className}`}
+        >
+            <span aria-hidden="true">gr</span>
+            <span
+                aria-hidden="true"
+                className="mx-[0.05em] inline-block h-[0.42em] w-[0.42em] translate-y-[-0.06em] rounded-full bg-current"
+            />
+            <span aria-hidden="true">sp</span>
+        </span>
     );
 }
 
