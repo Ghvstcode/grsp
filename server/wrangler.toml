@@ -8,7 +8,7 @@ APP_DEEP_LINK_SCHEME = "grsp"
 [[d1_databases]]
 binding = "DB"
 database_name = "grsp-db"
-database_id = "00000000-0000-0000-0000-000000000000" # replace with the id printed by `wrangler d1 create grsp-db`
+database_id = "fc6cc557-d5e4-497e-ab86-3867513a7f31"
 migrations_dir = "migrations"
 
 # 30 batches a minute per address on /metrics/events. The app sends one
