@@ -17,6 +17,8 @@ const INSTALL_ID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EVENT_TYPE = /^[a-z][a-z0-9_]{0,47}$/;
 const MAX_EVENT_DATA_CHARS = 2000;
+// 100 events of at most ~2KB each, with headroom.
+const MAX_BODY_BYTES = 256 * 1024;
 
 function isValidEvent(e: unknown): e is MetricEvent {
     if (typeof e !== "object" || e === null) return false;
@@ -35,6 +37,18 @@ function isValidEvent(e: unknown): e is MetricEvent {
  * the account. Either one is enough.
  */
 metrics.post("/metrics/events", async (c) => {
+    // The endpoint takes anonymous posts, so cap each address.
+    const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
+    const limited = await c.env.METRICS_LIMITER?.limit({ key: ip });
+    if (limited && !limited.success) {
+        return c.json({ error: "Too many requests" }, 429);
+    }
+
+    const length = Number(c.req.header("Content-Length") ?? 0);
+    if (length > MAX_BODY_BYTES) {
+        return c.json({ error: "Payload too large" }, 413);
+    }
+
     const body = await c.req
         .json<{ installId?: unknown; events?: unknown }>()
         .catch(() => undefined);

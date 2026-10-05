@@ -11,6 +11,14 @@ database_name = "grsp-db"
 database_id = "00000000-0000-0000-0000-000000000000" # replace with the id printed by `wrangler d1 create grsp-db`
 migrations_dir = "migrations"
 
+# 30 batches a minute per address on /metrics/events. The app sends one
+# batch every 30 seconds, so this only bites abuse.
+[[unsafe.bindings]]
+name = "METRICS_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
 [observability]
 [observability.logs]
 enabled = true
