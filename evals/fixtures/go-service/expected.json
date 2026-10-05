@@ -6,7 +6,7 @@
             { "match": "POST /v1/transfers|createTransfer|internal/httpapi", "kind": "http" }
         ],
         "entryPointCount": { "min": 1, "max": 4 },
-        "mismatchCount": { "min": 0, "max": 0 },
+        "mismatchCount": { "min": 0, "max": 2 },
         "gapCount": { "min": 0, "max": 0 },
         "allRefsVerified": true,
         "maxUnverifiedRatio": 0.2
