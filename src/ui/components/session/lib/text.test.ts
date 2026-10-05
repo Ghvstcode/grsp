@@ -10,6 +10,7 @@ import {
     isLongComment,
     plural,
     relativeTime,
+    shortPath,
     splitSuggestions,
     wordCount,
     wordCountLabel,
@@ -136,5 +137,24 @@ describe("isBot / authorName", () => {
         expect(isBot("coderabbitai[bot]")).toBe(true);
         expect(isBot("kemi.a")).toBe(false);
         expect(authorName("github-actions[bot]")).toBe("github-actions");
+    });
+});
+
+describe("shortPath", () => {
+    it("leaves short paths alone", () => {
+        expect(shortPath("orders/policies.py")).toBe("orders/policies.py");
+    });
+
+    it("keeps the end of long paths", () => {
+        expect(
+            shortPath(
+                "spa-frontend/src/views/app/cases/case-detail/CaseDetailDocumentsView.vue",
+            ),
+        ).toBe("…/case-detail/CaseDetailDocumentsView.vue");
+    });
+
+    it("always keeps the file name, however long", () => {
+        const name = "a".repeat(60) + ".ts";
+        expect(shortPath(`src/${name}`)).toBe(`…/${name}`);
     });
 });

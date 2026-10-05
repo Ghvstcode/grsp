@@ -152,9 +152,14 @@ export interface DiscussionCounts {
     automated: number;
 }
 
-/** A thread made only of bot comments (CI, linkbacks, review bots). */
+/**
+ * A general comment thread made only of bots (CI reports, linkbacks,
+ * auto-summaries). A bot's comment on a line of code is review feedback, so
+ * it stays a normal thread.
+ */
 export function isAutomatedThread(thread: DiscussionThread): boolean {
     return (
+        thread.path === undefined &&
         thread.comments.length > 0 &&
         thread.comments.every((c) => isBot(c.author))
     );

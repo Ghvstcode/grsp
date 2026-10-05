@@ -153,3 +153,19 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
 export function initialOf(name: string): string {
     return name.replace(/^@/, "").charAt(0).toUpperCase() || "?";
 }
+
+/**
+ * Long paths keep their end, where the file name is:
+ * "spa-frontend/src/views/app/cases/Detail.vue" → "…/cases/Detail.vue".
+ */
+export function shortPath(path: string, maxChars = 44): string {
+    if (path.length <= maxChars) return path;
+    const segments = path.split("/");
+    let kept = segments[segments.length - 1];
+    for (let i = segments.length - 2; i >= 0; i--) {
+        const next = `${segments[i]}/${kept}`;
+        if (next.length + 2 > maxChars) break;
+        kept = next;
+    }
+    return kept === path ? path : `…/${kept}`;
+}

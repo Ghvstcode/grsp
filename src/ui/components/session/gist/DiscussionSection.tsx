@@ -28,6 +28,7 @@ import {
     isLongComment,
     plural,
     relativeTime,
+    shortPath,
     splitSuggestions,
 } from "../lib/text";
 
@@ -168,12 +169,18 @@ function Thread({
     const automated = isAutomatedThread(thread);
     // Open threads start expanded; resolved and automated ones folded.
     const [open, setOpen] = useState(!thread.resolved && !automated);
-    const location =
+    const fullLocation =
         thread.path === undefined
             ? "General"
             : thread.line === undefined
               ? thread.path
               : `${thread.path}:${thread.line}`;
+    const location =
+        thread.path === undefined
+            ? "General"
+            : thread.line === undefined
+              ? shortPath(thread.path)
+              : `${shortPath(thread.path)}:${thread.line}`;
     return (
         <div
             className={cn(
@@ -203,10 +210,13 @@ function Thread({
                           ? "Automated"
                           : "Open"}
                 </span>
-                <span className="grsp-text-2 shrink-0 font-mono text-xs">
+                <span
+                    className="grsp-text-2 max-w-[46%] shrink-0 truncate font-mono text-xs"
+                    title={fullLocation}
+                >
                     {location}
                 </span>
-                <span className="grow truncate text-[13px]">
+                <span className="min-w-0 grow truncate text-[13px]">
                     {thread.gist ??
                         commentPreview(thread.comments[0]?.body ?? "")}
                 </span>

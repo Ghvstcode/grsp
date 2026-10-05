@@ -152,12 +152,21 @@ fn s(v: &Value, key: &str) -> String {
     v.get(key).and_then(Value::as_str).unwrap_or("").to_string()
 }
 
+/// The account's login. App accounts always end in "[bot]": REST already
+/// returns them that way, GraphQL returns the bare login with a `Bot` type.
 fn login_of(v: &Value, key: &str) -> String {
-    v.get(key)
-        .and_then(|u| u.get("login"))
-        .and_then(Value::as_str)
-        .unwrap_or("ghost")
-        .to_string()
+    let Some(user) = v.get(key) else {
+        return "ghost".to_string();
+    };
+    let login = user.get("login").and_then(Value::as_str).unwrap_or("ghost");
+    let is_bot = ["__typename", "type"]
+        .iter()
+        .any(|k| user.get(k).and_then(Value::as_str) == Some("Bot"));
+    if is_bot && !login.ends_with("[bot]") {
+        format!("{login}[bot]")
+    } else {
+        login.to_string()
+    }
 }
 
 /// A list response: a flat array, or `--slurp`'s array of page arrays.
@@ -376,7 +385,7 @@ pub fn parse_ci(check_runs_json: Option<&str>, combined_status_json: Option<&str
 
 // ── Discussion ─────────────────────────────────────────────
 
-const REVIEW_THREADS_QUERY: &str = "query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { reviewThreads(first: 100) { nodes { id isResolved isOutdated path line originalLine comments(first: 100) { nodes { databaseId author { login } body createdAt } } } } } } }";
+const REVIEW_THREADS_QUERY: &str = "query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { reviewThreads(first: 100) { nodes { id isResolved isOutdated path line originalLine comments(first: 100) { nodes { databaseId author { __typename login } body createdAt } } } } } } }";
 
 /// Raw JSON for everything the Discussion section shows.
 #[derive(Debug, Clone, Default)]
@@ -740,6 +749,20 @@ pub fn post_review(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn graphql_bot_authors_get_the_bot_suffix() {
+        let v: Value = serde_json::from_str(
+            r#"{"a": {"__typename": "Bot", "login": "coderabbitai"},
+                "b": {"type": "Bot", "login": "github-actions[bot]"},
+                "c": {"__typename": "User", "login": "maya"}}"#,
+        )
+        .unwrap();
+        assert_eq!(login_of(&v, "a"), "coderabbitai[bot]");
+        assert_eq!(login_of(&v, "b"), "github-actions[bot]");
+        assert_eq!(login_of(&v, "c"), "maya");
+        assert_eq!(login_of(&v, "missing"), "ghost");
+    }
 
     #[test]
     fn open_prs_are_parsed() {
