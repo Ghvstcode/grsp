@@ -2,8 +2,11 @@ name = "grsp-server"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
+routes = [{ pattern = "api.grsp.app", custom_domain = true }]
+
 [vars]
 APP_DEEP_LINK_SCHEME = "grsp"
+SERVER_URL = "https://api.grsp.app"
 
 [[d1_databases]]
 binding = "DB"
