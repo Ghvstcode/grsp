@@ -143,6 +143,7 @@ describe("discussion", () => {
         expect(discussionCounts(result)).toEqual({
             open: 2,
             resolved: 2,
+            automated: 1,
             comments: 8,
             people: 3,
         });

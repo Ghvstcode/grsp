@@ -35,6 +35,68 @@ export function splitSuggestions(body: string): CommentPart[] {
     return parts;
 }
 
+const ENTITIES: Record<string, string> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&nbsp;": " ",
+};
+
+/**
+ * GitHub bodies mix markdown with HTML: hidden `<!-- markers -->`,
+ * `<details>` blocks, `<a>` links, `<sub>`, `<br>`. Turn the useful parts
+ * into markdown and drop the rest, so nothing renders as raw markup. Code
+ * fences and inline code are left untouched.
+ */
+export function cleanGithubMarkdown(body: string): string {
+    // Split out code so tags inside it survive.
+    const pieces = body.split(/(```[\s\S]*?```|`[^`\n]+`)/g);
+    return pieces
+        .map((piece, index) => {
+            if (index % 2 === 1) return piece;
+            return piece
+                .replace(/<!--[\s\S]*?-->/g, "")
+                .replace(
+                    /<summary[^>]*>([\s\S]*?)<\/summary>/gi,
+                    (_m, inner: string) => `\n\n**${inner.trim()}**\n\n`,
+                )
+                .replace(
+                    /<a\s[^>]*?href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+                    (_m, href: string, text: string) =>
+                        `[${text.replace(/<[^>]+>/g, "").trim() || href}](${href})`,
+                )
+                .replace(/<br\s*\/?>/gi, "\n")
+                .replace(/<\/(?:p|div|details|li|tr|h[1-6])>/gi, "\n\n")
+                .replace(/<li[^>]*>/gi, "- ")
+                .replace(/<(?:strong|b)>([\s\S]*?)<\/(?:strong|b)>/gi, "**$1**")
+                .replace(/<(?:em|i)>([\s\S]*?)<\/(?:em|i)>/gi, "*$1*")
+                .replace(/<code>([\s\S]*?)<\/code>/gi, "`$1`")
+                .replace(/<\/?[a-zA-Z][^>]*>/g, "")
+                .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (e) => ENTITIES[e]);
+        })
+        .join("")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
+/** One-paragraph plain-text preview of a GitHub comment, for clamping. */
+export function commentPreview(body: string): string {
+    return descriptionPreview(cleanGithubMarkdown(body));
+}
+
+/** GitHub marks app accounts with a "[bot]" suffix. */
+export function isBot(author: string): boolean {
+    return author.endsWith("[bot]");
+}
+
+/** "coderabbitai[bot]" → "coderabbitai". */
+export function authorName(author: string): string {
+    return author.replace(/\[bot\]$/, "");
+}
+
 /**
  * Plain-text preview of a markdown description for the 4-line clamp:
  * headings, list markers and emphasis are dropped, paragraphs joined.

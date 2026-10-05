@@ -1,54 +1,11 @@
 import { useState } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { Analysis, DiscoveryResult } from "@core/types/grsp";
 import { AnalysisSection, SkeletonLine } from "../shared/AnalysisSection";
 import { InlineText } from "../shared/InlineText";
+import { Markdown } from "../shared/Markdown";
 import { SectionLabel } from "../shared/SectionLabel";
-import { externalLinkClick } from "../lib/openExternal";
 import { honestyLine } from "../lib/status";
-import { descriptionPreview, wordCountLabel } from "../lib/text";
-
-const heading = "mb-1 mt-3.5 block text-[13px] font-semibold first:mt-0";
-
-/** PR descriptions render quietly: small headings, no colour, mono code. */
-const MARKDOWN: Components = {
-    h1: ({ children }) => <span className={heading}>{children}</span>,
-    h2: ({ children }) => <span className={heading}>{children}</span>,
-    h3: ({ children }) => <span className={heading}>{children}</span>,
-    h4: ({ children }) => <span className={heading}>{children}</span>,
-    p: ({ children }) => <p className="m-0 [&+p]:mt-2">{children}</p>,
-    ul: ({ children }) => (
-        <ul className="m-0 flex list-disc flex-col gap-1 pl-[18px]">
-            {children}
-        </ul>
-    ),
-    ol: ({ children }) => (
-        <ol className="m-0 flex list-decimal flex-col gap-1 pl-[18px]">
-            {children}
-        </ol>
-    ),
-    code: ({ children }) => (
-        <code className="font-mono text-[13px]">{children}</code>
-    ),
-    pre: ({ children }) => (
-        <pre className="grsp-bg-wash my-2 overflow-x-auto rounded-lg px-3 py-2 font-mono text-[12.5px]">
-            {children}
-        </pre>
-    ),
-    a: ({ children, href }) => (
-        <a
-            href={href}
-            target="_blank"
-            rel="noreferrer"
-            onClick={externalLinkClick}
-            className="underline underline-offset-[3px]"
-        >
-            {children}
-        </a>
-    ),
-    img: () => null,
-};
+import { commentPreview, wordCountLabel } from "../lib/text";
 
 function AuthorSays({ description }: { description: string }) {
     const [open, setOpen] = useState(false);
@@ -70,17 +27,10 @@ function AuthorSays({ description }: { description: string }) {
             ) : (
                 <>
                     {open ? (
-                        <div className="grsp-text-1 min-w-0 break-words">
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={MARKDOWN}
-                            >
-                                {description}
-                            </ReactMarkdown>
-                        </div>
+                        <Markdown>{description}</Markdown>
                     ) : (
                         <p className="grsp-text-1 m-0 line-clamp-4">
-                            {descriptionPreview(description)}
+                            {commentPreview(description)}
                         </p>
                     )}
                     <button

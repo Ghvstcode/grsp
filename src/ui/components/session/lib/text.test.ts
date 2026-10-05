@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { PR_DESCRIPTION } from "@core/fixtures/scenario";
 import {
+    authorName,
+    cleanGithubMarkdown,
+    commentPreview,
     descriptionPreview,
+    isBot,
     initialOf,
     isLongComment,
     plural,
@@ -83,5 +87,54 @@ describe("small helpers", () => {
         expect(plural(1, "comment")).toBe("1 comment");
         expect(plural(3, "person", "people")).toBe("3 people");
         expect(initialOf("@dayo.b")).toBe("D");
+    });
+});
+
+describe("cleanGithubMarkdown", () => {
+    it("drops hidden markers and unwraps details blocks", () => {
+        const body = [
+            "<!-- linear-linkback -->",
+            "<details>",
+            '<summary><a href="https://linear.app/x/SHP-1083">SHP-1083 Add documents</a></summary>',
+            "<p>Body text</p>",
+            "</details>",
+        ].join("\n");
+        expect(cleanGithubMarkdown(body)).toBe(
+            "**[SHP-1083 Add documents](https://linear.app/x/SHP-1083)**\n\nBody text",
+        );
+    });
+
+    it("keeps markdown and leaves code untouched", () => {
+        const body =
+            "<!-- smart-e2e-selection -->\n## Smoke tier selected\n\nUse `<details>` here.\n\n```html\n<!-- kept -->\n<b>kept</b>\n```";
+        expect(cleanGithubMarkdown(body)).toBe(
+            "## Smoke tier selected\n\nUse `<details>` here.\n\n```html\n<!-- kept -->\n<b>kept</b>\n```",
+        );
+    });
+
+    it("converts simple inline tags and entities", () => {
+        expect(
+            cleanGithubMarkdown(
+                "<b>Note</b>: a &lt; b<br>next <sub>small</sub>",
+            ),
+        ).toBe("**Note**: a < b\nnext small");
+    });
+});
+
+describe("commentPreview", () => {
+    it("is plain text with no markup", () => {
+        expect(
+            commentPreview(
+                "<!-- auto-generated -->\n<details><summary>Summary</summary>\n\n- one\n- two\n</details>",
+            ),
+        ).toBe("Summary one two");
+    });
+});
+
+describe("isBot / authorName", () => {
+    it("recognises GitHub app accounts", () => {
+        expect(isBot("coderabbitai[bot]")).toBe(true);
+        expect(isBot("kemi.a")).toBe(false);
+        expect(authorName("github-actions[bot]")).toBe("github-actions");
     });
 });

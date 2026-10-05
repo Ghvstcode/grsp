@@ -15,11 +15,16 @@ import { CodeBlock } from "../shared/CodeBlock";
 import { SectionLabel } from "../shared/SectionLabel";
 import {
     discussionCounts,
+    isAutomatedThread,
     discussionOneLiner,
     sectionState,
 } from "../lib/status";
+import { Markdown } from "../shared/Markdown";
 import {
+    authorName,
+    commentPreview,
     initialOf,
+    isBot,
     isLongComment,
     plural,
     relativeTime,
@@ -94,31 +99,39 @@ function Comment({
         .filter((p) => p.kind === "text")
         .map((p) => p.text)
         .join("\n\n");
-    const long = isLongComment(prose);
+    const preview = useMemo(() => commentPreview(prose), [prose]);
+    const long = isLongComment(preview);
+    const bot = isBot(comment.author);
 
     return (
         <div className="flex gap-3">
             <div className="grsp-border-strong flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold">
-                {initialOf(comment.author)}
+                {initialOf(authorName(comment.author))}
             </div>
             <div className="flex min-w-0 grow flex-col gap-1">
-                <span className="text-xs">
-                    <span className="font-semibold">@{comment.author}</span>
+                <span className="flex items-center gap-1.5 text-xs">
+                    <span className="font-semibold">
+                        @{authorName(comment.author)}
+                    </span>
+                    {bot && (
+                        <span className="grsp-border-strong rounded-[4px] border px-1 text-[10px] leading-[14px] text-muted-foreground">
+                            bot
+                        </span>
+                    )}
                     <span className="text-muted-foreground">
-                        {" "}
                         · {relativeTime(comment.createdAt)}
                     </span>
                 </span>
-                {prose && (
-                    <p
-                        className={cn(
-                            "grsp-text-1 m-0 max-w-[720px] whitespace-pre-line break-words text-[13.5px]",
-                            long && !expanded && "line-clamp-3",
-                        )}
-                    >
-                        {prose}
-                    </p>
-                )}
+                {preview &&
+                    (long && !expanded ? (
+                        <p className="grsp-text-1 m-0 line-clamp-3 max-w-[720px] break-words text-[13.5px]">
+                            {preview}
+                        </p>
+                    ) : (
+                        <Markdown className="max-w-[720px] text-[13.5px]">
+                            {prose}
+                        </Markdown>
+                    ))}
                 {long && (
                     <button
                         type="button"
@@ -151,8 +164,10 @@ function Thread({
     sessionId: string;
     thread: DiscussionThread;
 }) {
-    // Open threads start expanded, resolved ones folded.
-    const [open, setOpen] = useState(!thread.resolved);
+    // Automated comments (CI, linkbacks, review bots) aren't discussion.
+    const automated = isAutomatedThread(thread);
+    // Open threads start expanded; resolved and automated ones folded.
+    const [open, setOpen] = useState(!thread.resolved && !automated);
     const location =
         thread.path === undefined
             ? "General"
@@ -163,7 +178,7 @@ function Thread({
         <div
             className={cn(
                 "rounded-[9px] border",
-                thread.resolved
+                thread.resolved || automated
                     ? "grsp-border-soft grsp-bg-panel"
                     : "grsp-border-strong",
             )}
@@ -177,18 +192,23 @@ function Thread({
                 <span
                     className={cn(
                         "w-[70px] shrink-0 rounded-[4px] border px-2 py-[2px] text-center text-[11px] leading-[16.5px]",
-                        thread.resolved
+                        thread.resolved || automated
                             ? "text-muted-foreground"
                             : "border-foreground bg-foreground text-background",
                     )}
                 >
-                    {thread.resolved ? "Resolved" : "Open"}
+                    {thread.resolved
+                        ? "Resolved"
+                        : automated
+                          ? "Automated"
+                          : "Open"}
                 </span>
                 <span className="grsp-text-2 shrink-0 font-mono text-xs">
                     {location}
                 </span>
                 <span className="grow truncate text-[13px]">
-                    {thread.gist ?? thread.comments[0]?.body ?? ""}
+                    {thread.gist ??
+                        commentPreview(thread.comments[0]?.body ?? "")}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                     {plural(thread.comments.length, "comment")}
@@ -335,13 +355,20 @@ export function DiscussionSection({
                             </p>
                         </div>
                     )}
-                    {result.threads.map((thread) => (
-                        <Thread
-                            key={thread.id}
-                            sessionId={sessionId}
-                            thread={thread}
-                        />
-                    ))}
+                    {/* People first; automated comments sink to the bottom. */}
+                    {[...result.threads]
+                        .sort(
+                            (a, b) =>
+                                Number(isAutomatedThread(a)) -
+                                Number(isAutomatedThread(b)),
+                        )
+                        .map((thread) => (
+                            <Thread
+                                key={thread.id}
+                                sessionId={sessionId}
+                                thread={thread}
+                            />
+                        ))}
                 </div>
             )}
         </div>

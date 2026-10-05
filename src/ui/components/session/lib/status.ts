@@ -7,11 +7,12 @@ import type {
     CiStatus,
     CodeRef,
     DiscussionResult,
+    DiscussionThread,
     Excerpt,
     ReviewSession,
     VerificationReport,
 } from "@core/types/grsp";
-import { plural } from "./text";
+import { isBot, plural } from "./text";
 
 /** What a Gist section (or any analysis-backed view) should render. */
 export type SectionState = "waiting" | "running" | "error" | "done";
@@ -147,21 +148,39 @@ export interface DiscussionCounts {
     resolved: number;
     comments: number;
     people: number;
+    /** Threads made only of bot comments. */
+    automated: number;
 }
 
+/** A thread made only of bot comments (CI, linkbacks, review bots). */
+export function isAutomatedThread(thread: DiscussionThread): boolean {
+    return (
+        thread.comments.length > 0 &&
+        thread.comments.every((c) => isBot(c.author))
+    );
+}
+
+/** Counts what people said; automated threads are tallied separately. */
 export function discussionCounts(result: DiscussionResult): DiscussionCounts {
     const people = new Set<string>();
     let comments = 0;
+    let botComments = 0;
     for (const thread of result.threads) {
         for (const comment of thread.comments) {
-            people.add(comment.author);
-            comments += 1;
+            if (isBot(comment.author)) {
+                botComments += 1;
+            } else {
+                people.add(comment.author);
+                comments += 1;
+            }
         }
     }
+    const human = result.threads.filter((t) => !isAutomatedThread(t));
     return {
-        open: result.threads.filter((t) => !t.resolved).length,
-        resolved: result.threads.filter((t) => t.resolved).length,
-        comments: Math.max(comments, result.commentCount),
+        open: human.filter((t) => !t.resolved).length,
+        resolved: human.filter((t) => t.resolved).length,
+        automated: result.threads.length - human.length,
+        comments: Math.max(comments, result.commentCount - botComments),
         people: people.size,
     };
 }

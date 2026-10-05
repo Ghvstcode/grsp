@@ -476,7 +476,7 @@ export function questionsResult(): QuestionsResult {
 export function discussionResult(): DiscussionResult {
     return {
         digest: "The author agreed to move the €10k threshold into settings as a follow-up. Nobody has answered whether delegated approvers could approve their own orders, and that's the one that could matter before merge. The two resolved threads were a rename and a boundary test, both done.",
-        commentCount: 8,
+        commentCount: 9,
         threads: [
             {
                 id: "t1",
@@ -558,6 +558,19 @@ export function discussionResult(): DiscussionResult {
                         author: "kemi.a",
                         createdAt: ago(50),
                         body: "Added in 3f2a91c.",
+                    },
+                ],
+            },
+            {
+                id: "t5",
+                resolved: false,
+                gist: "CI bot reports the smoke E2E tier was selected.",
+                comments: [
+                    {
+                        id: "c9",
+                        author: "github-actions[bot]",
+                        createdAt: ago(45),
+                        body: '<!-- smart-e2e-selection -->\n## Smart E2E Selection — Smoke tier selected\n\n<details>\n<summary><a href="https://example.com/runs/482">Why this tier</a></summary>\n\n- Only `orders/` and `approvals/` changed\n- No migration touches a shared table\n\n</details>\n\n| Suite | Tests |\n| --- | --- |\n| smoke | 14 |',
                     },
                 ],
             },
