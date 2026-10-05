@@ -1,139 +1,165 @@
 <p align="center">
   <a href="https://grsp.app">
-    <img src="icon.png" alt="grsp" width="72" />
+    <img src=".github/assets/hero.png" alt="grsp. Review code without reading diffs." width="880" />
   </a>
 </p>
 
-<h1 align="center">grsp</h1>
-
 <p align="center">
-  <b>Review code without reading diffs.</b>
+  <b>grsp is a macOS app that shows you what a pull request does, not just which lines moved.</b><br />
+  It runs on the Claude Code or Codex subscription you already have. No API keys.
 </p>
 
 <p align="center">
+  <a href="https://github.com/Ghvstcode/grsp/releases/latest/download/grsp_aarch64.dmg"><img src="https://img.shields.io/badge/Download-Apple%20silicon-0a0a0a?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Apple silicon" /></a>
+  &nbsp;
+  <a href="https://github.com/Ghvstcode/grsp/releases/latest/download/grsp_x64.dmg"><img src="https://img.shields.io/badge/Download-Intel-0a0a0a?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Intel Macs" /></a>
+</p>
+
+<p align="center">
+  <a href="https://grsp.app">Website</a> &nbsp;·&nbsp;
   <a href="https://grsp.app/docs">Docs</a> &nbsp;·&nbsp;
   <a href="https://grsp.app/changelog">Changelog</a> &nbsp;·&nbsp;
-  <a href="https://grsp.app/#download">Download</a> &nbsp;·&nbsp;
-  <a href="#contributing">Contributing</a>
+  <a href="#build-from-source">Build from source</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Ghvstcode/grsp/releases/latest"><img src="https://img.shields.io/github/v/release/Ghvstcode/grsp?color=0a0a0a&label=release" alt="Latest release" /></a>
+  <a href="https://github.com/Ghvstcode/grsp/actions/workflows/lint-and-format.yml"><img src="https://github.com/Ghvstcode/grsp/actions/workflows/lint-and-format.yml/badge.svg" alt="Lint, Format and Test" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/Ghvstcode/grsp?color=0a0a0a" alt="License: GPL-2.0" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS-0a0a0a" alt="Platform: macOS" />
 </p>
 
 ---
 
-A diff tells you which lines changed. It doesn't tell you what the system does differently now, which paths the author forgot, or whether the description is true.
+A diff tells you which lines changed. It doesn't tell you what the system does differently now, which paths the author forgot, or whether the description is still true.
 
-**grsp** is a macOS app for _understanding_ pull requests. Point it at a PR and it uses the [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex/cli) subscription you already have to explore the change in a read-only worktree, then checks every claim the agent makes against git before showing it to you.
+Point grsp at a pull request and your own coding agent reads the change in a read-only worktree. Then grsp checks every claim the agent makes against git before any of it reaches your screen. You get the behaviour, with the code beside it as proof.
+
+## What you get
+
+### Gist
+
+What the author says, next to what the code does. If they disagree, that is the first thing you see.
+
+<p align="center">
+  <img src=".github/assets/gist.png" alt="The Gist tab: Author says beside Code does, a mismatch callout, the affected entry points and the Ask panel" width="880" />
+</p>
+
+Below that: every entry point whose behaviour changes, the ones the PR should have touched and didn't, questions to test your understanding, the GitHub discussion, and an Ask panel that answers with code excerpts and `file:line` references.
+
+### Walkthrough
+
+Step through the changed behaviour block by block, from the entry point to the database write. Try "what if" inputs to see which path they take.
+
+<p align="center">
+  <img src=".github/assets/walkthrough.png" alt="The Walkthrough tab: stepping through a bulk import job that skips the new approval check" width="880" />
+</p>
+
+### Review
+
+Run an AI review with your own prompt. Edit the findings, choose which to include, pick a verdict and post it to GitHub as a normal review.
+
+<p align="center">
+  <img src=".github/assets/review.png" alt="The Review tab: three findings, one blocking, each with a code excerpt and an editable comment" width="880" />
+</p>
+
+<sub>Screenshots are the app running on its built-in fixture scenario. You can open the same screens yourself with <a href="#build-from-source">fixture mode</a>.</sub>
 
 ## How it works
 
-**1. Point it at a PR**
-Paste a GitHub PR URL, pick from a repo's open PRs, or choose two branches. grsp fetches the refs and checks out a read-only worktree at the PR head.
+<p align="center">
+  <img src=".github/assets/how-it-works.png" alt="Point it at a PR, your agent explores read-only, grsp verifies every claim against git, then you understand and review" width="880" />
+</p>
 
-**2. See what it actually does**
-The **Gist** puts "Author says" next to "Code does" and calls out any mismatch, lists the entry points whose behaviour changes (and the ones the PR should have touched and didn't), and answers your questions with code excerpts and `file:line` references. The **Walkthrough** lets you step through the changed behaviour block by block — route → service → policy → DB write → event — and try "what if" inputs.
+1. **Point it at a PR.** Paste a GitHub PR link, pick from a repo's open PRs, or choose two branches. If you don't have the repo locally, grsp offers to clone it.
+2. **Your agent explores.** grsp fetches the refs, checks out a detached worktree at the PR head and runs Claude Code or Codex against it in read-only mode.
+3. **grsp verifies.** Every `file:line` the agent returns is matched against the worktree. A reference that is a few lines off is snapped to the right line; one that can't be found is dropped.
+4. **You read the result.** Each section appears as soon as it is ready, and tells you how much was explored, verified and left unverified.
 
-**3. Review with confidence**
-Run an AI review with your own prompt. Edit the findings, pick a verdict, and post it to GitHub as a normal review.
-
-## The rule
+The whole design follows one rule:
 
 > **The agent discovers and interprets. git and the worktree confirm.**
 
-grsp does no language parsing, so it works on any codebase your agent can read. Its Rust core provides git facts, verification and orchestration: change status, line numbers, code excerpts, comment threads and CI never come from agent output, and every `file:line` the agent returns is verified against the worktree before it's shown. References that can't be verified are dropped, and the Gist tells you how many were.
+Change status, line numbers, code excerpts, comment threads and CI never come from agent output.
 
-No API keys. No code leaves your machine except through your own agent.
+## Why it's different
 
-## Get started
+- **It can't show you code that isn't there.** Locations are verified, excerpts are read from disk, and New / Changed / Unchanged is computed from the diff, never taken from the model. Mismatches and findings with no verified reference are not shown.
+- **It finds what the PR left out.** The most useful thing in a review is often the code path nobody touched. grsp lists those as "Not covered".
+- **Any language.** There is no parser and no list of supported frameworks. If your agent can read the code, grsp can verify what it says about it.
+- **No API keys.** grsp shells out to the `claude` or `codex` CLI you are already signed in to. It never asks for, uses or stores a model key.
+- **It doesn't touch your working copy.** The worktree lives in grsp's own data folder. Your branches and uncommitted work stay as they are.
+- **It spends your subscription carefully.** Results are cached by head commit, walkthroughs run when you open them, and nothing re-runs unless you ask.
 
-### Download (recommended)
+The eval suite runs the real pipelines against four fixture PRs in Python, TypeScript, Go and YAML/SQL. On the latest run with Claude Code, 280 code references were verified and 0 were dropped. Run it yourself with `pnpm eval`.
 
-**[Download for Mac →](https://grsp.app/#download)**
+## Quick start
 
-You'll need Claude Code or Codex installed and signed in, and the [GitHub CLI](https://cli.github.com) (`gh auth login`) for PR sessions. See the [Getting Started guide](https://grsp.app/docs#getting-started).
+1. Download grsp for [Apple silicon](https://github.com/Ghvstcode/grsp/releases/latest/download/grsp_aarch64.dmg) or [Intel](https://github.com/Ghvstcode/grsp/releases/latest/download/grsp_x64.dmg), open the `.dmg` and drag grsp into Applications.
+2. Make sure you have [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex/cli) installed and signed in. One is enough.
+3. For pull requests, install the [GitHub CLI](https://cli.github.com) and run `gh auth login`. Without it you can still compare two branches.
+4. Open grsp. Onboarding finds your agent, checks GitHub and asks for a repo folder. Then paste a PR link.
 
-### Build from source
+The [Getting Started guide](https://grsp.app/docs#getting-started) covers each step in more detail.
 
-**Prerequisites:** Node.js >= 22, Rust (stable), pnpm
+## Build from source
+
+You need macOS, Node.js 22 or newer, pnpm and stable Rust.
 
 ```bash
-git clone https://github.com/ghvstcode/grsp.git
+git clone https://github.com/Ghvstcode/grsp.git
 cd grsp
 pnpm install
 pnpm tauri:dev
 ```
 
-To explore the UI without an agent or a GitHub account, run it on fixture data:
+No agent or GitHub account to hand? Fixture mode renders every screen from a built-in scenario:
 
 ```bash
-VITE_GRSP_FIXTURES=1 pnpm tauri:dev
+VITE_GRSP_FIXTURES=1 pnpm tauri:dev    # in the app
+VITE_GRSP_FIXTURES=1 pnpm vite:dev     # in a browser, at localhost:1420
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development setup.
-
-### Nightly builds
-
-Nightly builds are published automatically from the latest `main` branch. They may include unreleased features or experimental changes.
-
-**[Browse nightly releases →](https://github.com/ghvstcode/grsp/releases/tag/nightly)**
-
-## Architecture
-
-| Layer         | Tech                                                                   |
-| ------------- | ---------------------------------------------------------------------- |
-| Desktop shell | [Tauri v2](https://v2.tauri.app) (Rust)                                |
-| Frontend      | React 19, TypeScript, Tailwind CSS, [shadcn/ui](https://ui.shadcn.com) |
-| State         | Zustand (client), TanStack Query (async)                               |
-| Database      | SQLite via tauri-plugin-sql                                            |
-| AI agents     | Claude Code, Codex (via CLI, read-only)                                |
-| GitHub        | The `gh` CLI                                                           |
-
-The Rust core (`src-tauri/src/`) is five modules:
-
-- **`git`** — resolves a PR to base and head, creates the read-only worktree, and builds the DiffMap from the merge base.
-- **`verify`** — the trust layer. Verifies every code reference (anchor match, snap, drop), computes change status from the DiffMap, spot-checks edges, and reads excerpts.
-- **`agent`** — one runner for `claude -p` (read-only tools) and `codex exec` (read-only sandbox): prompt layering, JSON parsing with one repair retry, progress lines, timeouts, cancellation.
-- **`pipelines`** — `discovery`, `questions`, `walkthrough`, `ask`, `discussion`, `review`. Each one is: build the prompt → run the agent → parse → verify → persist.
-- **`github`** — open PRs, metadata, CI, review threads, and posting reviews.
-
-Everything is cached in SQLite by head SHA. `src/core/types/grsp.ts` and `src-tauri/src/model.rs` are the contract between the two halves. See [docs/architecture.md](./docs/architecture.md).
-
-## Scripts
+Checks and tests:
 
 ```bash
-pnpm tauri:dev     # Start dev environment (Vite + Tauri)
-pnpm validate      # Lint + format check + typecheck
-pnpm test          # Frontend tests (Vitest)
-pnpm eval          # Run the real pipelines against the fixture repos and score them
-pnpm eval:test     # Unit-test the eval scorer
-cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit + contract tests
+pnpm validate    # lint, format check and typecheck
+pnpm test        # frontend tests (Vitest)
+cargo test --manifest-path src-tauri/Cargo.toml    # Rust unit and contract tests
+pnpm eval        # run the real pipelines on the fixture PRs and score them
 ```
 
-`pnpm eval` runs a real agent on your subscription against the tiny repos in [`evals/fixtures/`](./evals) — a Django order-approval PR with a bulk import that bypasses the new check, a TypeScript full-stack PR, a Go service, and a config-only PR — and prints a pass/fail line per expectation. It is local and on demand, never part of CI. See [evals/README.md](./evals/README.md).
+`pnpm eval` uses your own agent subscription, so it is local and on demand, never part of CI. See [evals/README.md](./evals/README.md).
 
-## Repository layout
+grsp is built with [Tauri 2](https://v2.tauri.app), React and Rust. The Rust core has five modules: `git`, `verify`, `agent`, `pipelines` and `github`. Every pipeline is the same shape: build the prompt, run the agent, parse, verify, persist. [docs/architecture.md](./docs/architecture.md) has the full picture.
 
-```
-src/          React frontend (ui/, core/)
-src-tauri/    Rust core (git, verify, agent, pipelines, github)
-web/          Landing page, docs and changelog (Next.js)
-server/       GitHub sign-in + metrics (Cloudflare Worker). Never sees your code.
-evals/        Fixture repos, fixture builder and scorer
-design/       SPEC.md (behaviour), DESIGN.md (look), prototype.html
-docs/         Architecture and release notes for contributors
-```
+## Privacy
+
+- **Your code stays on your Mac.** It is read from a local worktree, and the only place it goes is your own Claude Code or Codex, under the terms you already have with that provider. The agent runs read-only.
+- **Nothing is posted until you press Post.** GitHub is reached through `gh` with your account. Analyses and history live in a SQLite database on your disk.
+- **Usage metrics are anonymous and optional.** grsp's server handles sign-in and records which features are used and whether analyses finish. It never receives repository names, code, diffs, PR titles, questions, comments or agent output. Turn metrics off in Settings → General.
+
+More in the [privacy section of the docs](https://grsp.app/docs#privacy).
+
+## FAQ
+
+**Can the agent be wrong?**
+Yes. It can misread code like any reviewer. What it can't do is show you a location that doesn't exist or call unchanged code changed. Treat its notes as a well-read colleague's explanation, and the code beside them as the fact.
+
+**How much of my subscription does a review use?**
+A handful of agent passes per PR. The session footer shows the count, and nothing runs in the background.
+
+**Can I use it without GitHub?**
+Yes. Choose two branches as base and head. You get the Gist, Ask, walkthroughs and the AI review. There is no discussion and no posting.
+
+**Does it work on Windows or Linux?**
+Not today. grsp is a macOS app.
+
+More answers in the [docs FAQ](https://grsp.app/docs#faq).
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup instructions and coding conventions.
-
-## Documentation
-
-Full documentation is available at **[grsp.app/docs](https://grsp.app/docs)** covering:
-
-- [Getting Started](https://grsp.app/docs#getting-started) — install, onboarding, agents, GitHub
-- [How it works](https://grsp.app/docs#how-it-works) — agent-first, verification, caching, cost
-- [The three tabs](https://grsp.app/docs#tabs) — Gist, Walkthrough, Review
-- [Settings](https://grsp.app/docs#settings) — review prompt, `.grsp/prompt.md`, `.grsp/config.toml`
-- [Privacy](https://grsp.app/docs#privacy) and [FAQ](https://grsp.app/docs#faq)
+Issues and pull requests are welcome. [CONTRIBUTING.md](./CONTRIBUTING.md) has the setup, the conventions and the one rule every change has to respect.
 
 ## License
 
