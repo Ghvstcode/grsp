@@ -22,7 +22,7 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
 
             {/* Tagline */}
             <p className="text-muted-foreground font-mono text-sm tracking-widest uppercase animate-fade-in-up delay-200">
-                Understand the change.
+                Review code without reading diffs.
             </p>
 
             <p className="max-w-sm text-sm text-muted-foreground animate-fade-in-up delay-300">
