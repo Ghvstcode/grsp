@@ -106,6 +106,7 @@ jobs:
                   body: |
                       Automated QA build from `main` branch.
                       Commit: ${{ github.sha }}
+                  # upload-artifact strips the common path prefix and
+                  # merge-multiple flattens both architectures together.
                   files: |
-                      artifacts/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-                      artifacts/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+                      artifacts/dmg/*.dmg
