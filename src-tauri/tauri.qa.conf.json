@@ -47,7 +47,7 @@
         },
         "updater": {
             "dialog": true,
-            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc1OTQ2MjBCMTQ3MDA3QjQKUldTMEIzQVVDMktVZFNiZjdITnVBVTRZeUh1eTZlOEhGRExTMFlIbE8wQndrMjU2MlQyRDY1RisK",
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMzQ0Y2QzBCQzJGRTI2RDAKUldUUUp2N0NDMnpQTTNTSDVBWHNIWkI0TDZ4dVJiVUc5WjBNNGZQTSt6QzBnUlVVaFREVEdvN0YK",
             "endpoints": [
                 "https://github.com/ghvstcode/grsp/releases/latest/download/latest.json"
             ]
