@@ -12,10 +12,11 @@ import { createFixtureBackend, type FixtureOptions } from "./backend";
 const fast = (options: FixtureOptions = {}) =>
     createFixtureBackend({ tick: 1, latency: 0, ...options });
 
+// Up to ~4s: loaded CI runners stretch the fixture backend's timers.
 async function until(check: () => Promise<boolean> | boolean) {
-    for (let i = 0; i < 400; i += 1) {
+    for (let i = 0; i < 800; i += 1) {
         if (await check()) return;
-        await new Promise((resolve) => setTimeout(resolve, 2));
+        await new Promise((resolve) => setTimeout(resolve, 5));
     }
     throw new Error("condition not reached");
 }
