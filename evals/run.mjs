@@ -231,7 +231,7 @@ async function runFixture(name, options) {
                   "--quiet",
                   "--manifest-path",
                   MANIFEST,
-                  "--bin",
+                  "--example",
                   "grsp-eval",
                   "--",
                   ...args,

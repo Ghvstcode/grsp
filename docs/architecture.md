@@ -51,7 +51,7 @@ grsp/
 │   │   ├── agent/              # Claude Code / Codex runner
 │   │   ├── pipelines/          # discovery, questions, walkthrough, ask, discussion, review
 │   │   ├── github/             # PRs, CI, threads, posting reviews
-│   │   └── bin/grsp-eval.rs    # Headless pipeline runner used by `pnpm eval`
+│   ├── examples/grsp-eval.rs   # Headless pipeline runner used by `pnpm eval` (not shipped in the app)
 │   ├── capabilities/           # Tauri v2 permission capabilities
 │   └── tauri.*.conf.json       # Environment-specific configs
 ├── evals/                      # Fixture repos, builder and scorer (pnpm eval)

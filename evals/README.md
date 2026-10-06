@@ -19,7 +19,7 @@ For each fixture, `run.mjs`:
 
 1. builds the fixture into a real git repo under `evals/.repos/<name>` (`main` = `base/`, `pr` = `head/`);
 2. runs the headless eval binary in branch-pair mode:
-   `cargo run --manifest-path src-tauri/Cargo.toml --bin grsp-eval -- --repo <path> --base main --head pr --title <t> --description-file <f> [--agent claude|codex] [--pipelines discovery,questions,walkthrough,ask,review] [--ask "question"]…`;
+   `cargo run --manifest-path src-tauri/Cargo.toml --example grsp-eval -- --repo <path> --base main --head pr --title <t> --description-file <f> [--agent claude|codex] [--pipelines discovery,questions,walkthrough,ask,review] [--ask "question"]…`;
 3. scores the single JSON document it prints on stdout against `expected.json`;
 4. prints one `PASS` / `FAIL` / `SKIP` line per expectation plus verification stats, and writes a timestamped report (including the raw output) to `evals/reports/`.
 
