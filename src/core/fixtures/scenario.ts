@@ -1135,12 +1135,17 @@ export const OPEN_PRS: Record<string, OpenPr[]> = {
             headRef: "chore/invoices-v2",
             hours: 28,
         }),
-        openPr("orders", 477, "Draft: tenant-specific approval limits", {
-            author: "kemi.a",
-            headRef: "spike/tenant-limits",
-            hours: 80,
-            isDraft: true,
-        }),
+        openPr(
+            "orders",
+            477,
+            "Tenant-specific approval limits, configurable per finance team, with an audit trail of every change to a limit",
+            {
+                author: "kemi.a",
+                headRef: "spike/tenant-limits",
+                hours: 80,
+                isDraft: true,
+            },
+        ),
     ],
     payments: [
         openPr("payments", 474, "Retry captures on provider 5xx", {
