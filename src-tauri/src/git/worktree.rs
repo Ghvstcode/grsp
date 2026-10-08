@@ -164,6 +164,21 @@ mod tests {
         )
         .unwrap();
 
+        // `git lfs install` also leaves a post-checkout hook that fails
+        // when git-lfs is missing.
+        let hook = repo.join(".git/hooks/post-checkout");
+        std::fs::create_dir_all(hook.parent().unwrap()).unwrap();
+        std::fs::write(
+            &hook,
+            "#!/bin/sh\necho 'This repository is configured for Git LFS but git-lfs was not found' >&2\nexit 2\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
         let dest = worktree_path(&tmp.path().join("appdata"), "lfs");
         create_worktree(repo.to_str().unwrap(), &dest, &sha).unwrap();
         assert_eq!(

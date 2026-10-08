@@ -16,6 +16,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
     {
+        version: "0.1.2",
+        date: "Oct 8th, 2026",
+        title: "Git LFS repositories, properly this time",
+        fixes: [
+            "Pull requests in Git LFS repositories still failed to open, now with \"This repository is configured for Git LFS but 'git-lfs' was not found\". 0.1.1 turned off the LFS filter but not the checkout hook that Git LFS installs. grsp no longer runs a repository's git hooks at all.",
+        ],
+    },
+    {
         version: "0.1.1",
         date: "Oct 8th, 2026",
         title: "Git LFS repositories, cleaner discussions, a new look",

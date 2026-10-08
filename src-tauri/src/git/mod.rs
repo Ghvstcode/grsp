@@ -117,26 +117,31 @@ pub(crate) fn git_cmd(dir: &Path) -> Command {
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_OPTIONAL_LOCKS", "0")
         .env("LC_ALL", "C");
-    // Git LFS: grsp only reads text, so check LFS files out as their small
-    // pointer files instead of running the `git-lfs` filter. That avoids
-    // downloading large assets, and avoids failing when `git-lfs` isn't on
-    // the PATH a macOS app gets.
-    for (i, (key, value)) in LFS_FILTER_OVERRIDES.iter().enumerate() {
+    // grsp only reads text, so LFS files are checked out as their small
+    // pointer files and no repository hooks run. Both would otherwise need
+    // `git-lfs`, which isn't on the PATH a macOS app gets.
+    for (i, (key, value)) in GIT_CONFIG_OVERRIDES.iter().enumerate() {
         cmd.env(format!("GIT_CONFIG_KEY_{i}"), key)
             .env(format!("GIT_CONFIG_VALUE_{i}"), value);
     }
-    cmd.env("GIT_CONFIG_COUNT", LFS_FILTER_OVERRIDES.len().to_string())
+    cmd.env("GIT_CONFIG_COUNT", GIT_CONFIG_OVERRIDES.len().to_string())
         .env("GIT_LFS_SKIP_SMUDGE", "1");
     cmd
 }
 
-/// Applied to every git command grsp runs. An empty filter is a no-op, but
-/// only when the filter isn't marked required, which `git lfs install` does.
-const LFS_FILTER_OVERRIDES: [(&str, &str); 4] = [
+/// Applied to every git command grsp runs.
+///
+/// - The LFS filter is switched off. An empty filter is a no-op, but only
+///   when it isn't marked required, which `git lfs install` does.
+/// - Repository hooks are switched off. `git lfs install` also adds a
+///   post-checkout hook that fails without `git-lfs`, and a tool that only
+///   reads a PR has no business running a repo's hooks anyway.
+const GIT_CONFIG_OVERRIDES: [(&str, &str); 5] = [
     ("filter.lfs.required", "false"),
     ("filter.lfs.process", ""),
     ("filter.lfs.smudge", ""),
     ("filter.lfs.clean", ""),
+    ("core.hooksPath", "/dev/null"),
 ];
 
 pub(crate) struct GitOutput {
