@@ -123,6 +123,60 @@ mod tests {
     use chrono::TimeZone;
 
     #[test]
+    fn lfs_files_check_out_as_pointers_without_git_lfs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        write(
+            &repo,
+            ".gitattributes",
+            "*.docx filter=lfs diff=lfs merge=lfs -text\n",
+        );
+        let pointer = "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 12\n";
+        write(&repo, "template.docx", pointer);
+        write(&repo, "a.txt", "one\n");
+        // Through run_git, so a global LFS setup on this machine can't interfere.
+        run_git(&repo, &["add", "-A"]).unwrap();
+        run_git(&repo, &["commit", "-q", "-m", "lfs"]).unwrap();
+        let sha = run_git(&repo, &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim()
+            .to_string();
+        // A repo set up for LFS on a machine where the filter can't run.
+        run_git(&repo, &["config", "filter.lfs.required", "true"]).unwrap();
+        run_git(
+            &repo,
+            &[
+                "config",
+                "filter.lfs.process",
+                "git-lfs-not-installed filter-process",
+            ],
+        )
+        .unwrap();
+        run_git(
+            &repo,
+            &[
+                "config",
+                "filter.lfs.smudge",
+                "git-lfs-not-installed smudge %f",
+            ],
+        )
+        .unwrap();
+
+        let dest = worktree_path(&tmp.path().join("appdata"), "lfs");
+        create_worktree(repo.to_str().unwrap(), &dest, &sha).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dest.join("template.docx")).unwrap(),
+            pointer
+        );
+        assert_eq!(
+            std::fs::read_to_string(dest.join("a.txt")).unwrap(),
+            "one\n"
+        );
+    }
+
+    #[test]
     fn worktree_path_layout() {
         let p = worktree_path(Path::new("/data/app"), "abc-123");
         assert_eq!(p, PathBuf::from("/data/app/worktrees/abc-123"));
