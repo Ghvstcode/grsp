@@ -16,6 +16,26 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
     {
+        version: "0.1.1",
+        date: "Oct 8th, 2026",
+        title: "Git LFS repositories, cleaner discussions, a new look",
+        description:
+            "Fixes from the first days of real use, plus grsp's own logo.",
+        features: [
+            "Paste a PR link for a repository you don't have locally and grsp offers to clone it for you",
+            "New logo and wordmark, with an animated intro on the welcome screen",
+        ],
+        improvements: [
+            "GitHub comments render as markdown; bot comments from CI, linkbacks and auto-summaries are folded as Automated and left out of the thread counts",
+            "Long file paths in discussion threads shorten to their file name instead of pushing the summary off the row",
+        ],
+        fixes: [
+            'Pull requests in repositories that use Git LFS failed to open with "smudge filter lfs failed"',
+            "The New review dialog spilled past its edge when a pull request had a long title",
+            "A newly created review was deselected a moment after opening",
+        ],
+    },
+    {
         version: "0.1.0",
         date: "Oct 3rd, 2026",
         title: "First release — understand pull requests instead of reading diffs",

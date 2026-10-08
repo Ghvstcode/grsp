@@ -1,6 +1,6 @@
 [package]
 name = "grsp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Understand pull requests instead of reading diffs"
 authors = ["grsp contributors"]
 edition = "2021"
