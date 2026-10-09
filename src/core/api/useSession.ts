@@ -11,6 +11,9 @@ export const sessionKeys = {
     session: (sessionId: string) => ["grsp", "session", sessionId] as const,
     analyses: (sessionId: string) => ["grsp", "analyses", sessionId] as const,
     ask: (sessionId: string) => ["grsp", "ask", sessionId] as const,
+    diff: (sessionId: string, headSha: string | undefined) =>
+        ["grsp", "diff", sessionId, headSha ?? ""] as const,
+    notes: (sessionId: string) => ["grsp", "notes", sessionId] as const,
     /** Shared with the shell's `useGithubStatus` (useAgents.ts). */
     githubStatus: ["github-status"] as const,
 };

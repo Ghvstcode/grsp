@@ -200,6 +200,74 @@ export function discussionOneLiner(result: DiscussionResult): string {
     return parts.join(" ");
 }
 
+/** Wording that depends on what a session reviews. */
+export interface SourceWording {
+    /** Label of the card that holds what the author wrote. */
+    authorLabel: string;
+    /** Shown in that card when the author wrote nothing. */
+    noDescription: string;
+    expand: string;
+    collapse: string;
+    /** Why there is no discussion; undefined for pull requests. */
+    noDiscussion?: string;
+    /** Why a review can't be posted; undefined for pull requests. */
+    noPosting?: string;
+    /** The idle review card's explanation. */
+    reviewIntro: string;
+    preparing: string;
+}
+
+export function sourceWording(session: ReviewSession): SourceWording {
+    const source = session.source;
+    if (source.kind === "pr") {
+        return {
+            authorLabel: "Author says",
+            noDescription: "No description to compare against.",
+            expand: "Read full description",
+            collapse: "Collapse description",
+            reviewIntro:
+                "Reads the change, the paths it touches and the existing discussion, then drafts inline comments. Nothing is posted until you choose a verdict.",
+            preparing: "Getting this pull request ready",
+        };
+    }
+    if (source.kind === "branches") {
+        return {
+            authorLabel: "Author says",
+            noDescription: "No description to compare against.",
+            expand: "Read full description",
+            collapse: "Collapse description",
+            noDiscussion:
+                "There's no discussion for a branch comparison. Open a pull request to see its threads here.",
+            noPosting:
+                "Posting isn't available for a branch comparison. Open a pull request for these branches to post this review to GitHub.",
+            reviewIntro:
+                "Reads the change and the paths it touches, then drafts comments. A branch comparison has no pull request, so nothing can be posted.",
+            preparing: "Getting these branches ready",
+        };
+    }
+    const one = source.count === 1;
+    return {
+        authorLabel: one ? "Commit message" : "Commit messages",
+        noDescription: one
+            ? "The commit message is only its subject line."
+            : "These commits have no message beyond their subject lines.",
+        expand: one ? "Read full message" : "Read all messages",
+        collapse: one ? "Collapse message" : "Collapse messages",
+        noDiscussion: one
+            ? "There's no discussion for a commit. Comments live on pull requests; your own notes are under Notes."
+            : "There's no discussion for commits. Comments live on pull requests; your own notes are under Notes.",
+        noPosting: one
+            ? "Posting isn't available for a commit: there's no pull request to post to. The findings and your edits stay here."
+            : "Posting isn't available for commits: there's no pull request to post to. The findings and your edits stay here.",
+        reviewIntro: one
+            ? "Reads the commit and the paths it touches, then drafts comments. A commit has no pull request, so nothing can be posted."
+            : "Reads these commits and the paths they touch, then drafts comments. Commits have no pull request, so nothing can be posted.",
+        preparing: one
+            ? "Getting this commit ready"
+            : "Getting these commits ready",
+    };
+}
+
 /** A session is a PR (not a branch pair) with a number and a URL. */
 export function prOf(session: ReviewSession) {
     return session.source.kind === "pr" ? session.source : undefined;

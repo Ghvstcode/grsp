@@ -1,4 +1,5 @@
 import type { Repo, RepoNotAddedError, ReviewSession } from "@core/types/grsp";
+import { commitsLabel } from "./commits";
 
 export type SessionStatusLabel =
     | "In progress"
@@ -22,19 +23,42 @@ export function sessionStatusLabel(session: ReviewSession): SessionStatusLabel {
     return "In progress";
 }
 
-/** `#482` for PR sessions, `head → base` for branch-pair sessions. */
+/**
+ * `#482` for PR sessions, `head → base` for branch-pair sessions, and the
+ * short SHA (or `5 commits`) for commit sessions.
+ */
 export function sessionRefLabel(session: ReviewSession): string {
-    if (session.source.kind === "pr") return `#${session.source.number}`;
-    return `${session.source.head} → ${session.source.base}`;
+    const source = session.source;
+    switch (source.kind) {
+        case "pr":
+            return `#${source.number}`;
+        case "branches":
+            return `${source.head} → ${source.base}`;
+        case "commits":
+            return commitsLabel(source);
+    }
 }
 
-/** Title to show; branch sessions without one fall back to the head branch. */
+/**
+ * Title to show. Without one, branch sessions fall back to the head branch
+ * and commit sessions to what was picked.
+ */
 export function sessionTitle(session: ReviewSession): string {
     const title = session.title.trim();
     if (title) return title;
-    return session.source.kind === "branches"
-        ? session.source.head
-        : "Untitled pull request";
+    const source = session.source;
+    switch (source.kind) {
+        case "pr":
+            return "Untitled pull request";
+        case "branches":
+            return source.head;
+        case "commits":
+            return source.count === 1
+                ? "Untitled commit"
+                : source.branch
+                  ? `Commits on ${source.branch}`
+                  : "Untitled commits";
+    }
 }
 
 /**

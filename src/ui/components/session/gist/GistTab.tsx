@@ -5,6 +5,7 @@ import {
     useSetQuestionOpened,
     type SessionAnalyses,
 } from "@core/api/useAnalysis";
+import { sourceWording } from "../lib/status";
 import { AffectedList } from "./AffectedList";
 import { AskPanel } from "./AskPanel";
 import { AuthorCodeCards } from "./AuthorCodeCards";
@@ -18,10 +19,19 @@ interface GistTabProps {
     settings: GrspSettings;
     /** Open the walkthrough for an entry point, at the block `refs` point to. */
     onWalk: (entryPointId: string, refs?: CodeRef[]) => void;
+    /** The notes panel takes the Ask panel's place while it is open. */
+    showAsk?: boolean;
 }
 
 /** The scrolling Gist column with the fixed Ask panel on its right. */
-export function GistTab({ session, analyses, settings, onWalk }: GistTabProps) {
+export function GistTab({
+    session,
+    analyses,
+    settings,
+    onWalk,
+    showAsk = true,
+}: GistTabProps) {
+    const wording = sourceWording(session);
     const run = useRunAnalysis(session.id);
     const cancel = useCancelAnalysis(session.id);
     const setOpened = useSetQuestionOpened(session.id);
@@ -34,6 +44,7 @@ export function GistTab({ session, analyses, settings, onWalk }: GistTabProps) {
                 <div className="flex flex-col gap-8 px-9 pb-12 pt-7">
                     <AuthorCodeCards
                         description={session.description}
+                        wording={wording}
                         discovery={discovery}
                         onRetry={() => run.mutate("discovery")}
                         onCancel={() => cancel.mutate("discovery")}
@@ -72,17 +83,19 @@ export function GistTab({ session, analyses, settings, onWalk }: GistTabProps) {
                     )}
                     <DiscussionSection
                         sessionId={session.id}
-                        isPr={session.source.kind === "pr"}
+                        unavailable={wording.noDiscussion}
                         discussion={analyses?.discussion}
                         onRetry={() => run.mutate("discussion")}
                         onCancel={() => cancel.mutate("discussion")}
                     />
                 </div>
             </section>
-            <AskPanel
-                session={session}
-                suggestions={result?.askSuggestions ?? []}
-            />
+            {showAsk && (
+                <AskPanel
+                    session={session}
+                    suggestions={result?.askSuggestions ?? []}
+                />
+            )}
         </div>
     );
 }

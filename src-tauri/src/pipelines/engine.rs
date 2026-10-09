@@ -369,6 +369,9 @@ impl Engine {
         input: NewSessionInput,
     ) -> Result<(ReviewSession, bool), String> {
         let conn = self.conn()?;
+        // Commit sessions are resolved here, not while preparing: the SHAs
+        // are what identifies the session.
+        let mut commit_range: Option<git::CommitRange> = None;
         let (repo, source) = match input {
             NewSessionInput::Url { url } => {
                 let pr = git::parse_pr_url(&url).ok_or_else(|| {
@@ -422,6 +425,26 @@ impl Engine {
                     },
                 )
             }
+            NewSessionInput::Commits {
+                repo_id,
+                branch,
+                head,
+                from,
+            } => {
+                let repo =
+                    db::get_repo(&conn, &repo_id)?.ok_or("That repository no longer exists.")?;
+                let range = git::resolve_commit_range(&repo.path, &head, from.as_deref())?;
+                let source = SessionSource::Commits {
+                    branch: branch
+                        .map(|b| b.trim().to_string())
+                        .filter(|b| !b.is_empty()),
+                    base: range.base_sha.clone(),
+                    head: range.head_sha.clone(),
+                    count: range.count,
+                };
+                commit_range = Some(range);
+                (repo, source)
+            }
         };
 
         if let Some(existing) = db::find_session_by_source(&conn, &repo.id, &source)? {
@@ -464,6 +487,23 @@ impl Engine {
                 session.title = head.clone();
                 session.base_ref = base.clone();
                 session.head_ref = head.clone();
+            }
+            SessionSource::Commits {
+                branch, base, head, ..
+            } => {
+                let range = commit_range
+                    .as_ref()
+                    .ok_or("Couldn't read the commits to review.")?;
+                session.title = git::commit_session_title(range, branch.as_deref());
+                session.description = git::commit_session_description(range);
+                session.author = git::commit_session_author(range);
+                session.base_ref = short(base).to_string();
+                session.head_ref = branch.clone().unwrap_or_else(|| short(head).to_string());
+                // Pinned from the start. The base is an ancestor of the head
+                // (or the empty tree), so it is also the merge base.
+                session.base_sha = Some(base.clone());
+                session.head_sha = Some(head.clone());
+                session.merge_base_sha = Some(base.clone());
             }
         }
         db::insert_session(&conn, &session, None)?;
@@ -510,6 +550,26 @@ impl Engine {
                 self.emit_session(session_id, Some(&format!("Resolving {base} and {head}")));
                 git::resolve_branch_pair(&repo.path, base, head)?
             }
+            SessionSource::Commits {
+                base, head, count, ..
+            } => {
+                let step = if *count > 1 {
+                    format!("Reading {count} commits up to {}", short(head))
+                } else {
+                    format!("Reading commit {}", short(head))
+                };
+                self.emit_session(session_id, Some(&step));
+                // Nothing to fetch or resolve: the commits were pinned when
+                // the session was created. Only check they are still here.
+                let head_sha = git::rev_parse(&repo.path, head).map_err(|_| {
+                    format!("Commit {} is no longer in this repository.", short(head))
+                })?;
+                git::ResolvedRefs {
+                    base_sha: base.clone(),
+                    head_sha,
+                    merge_base_sha: base.clone(),
+                }
+            }
         };
         db::set_session_refs(
             &conn,
@@ -540,14 +600,22 @@ impl Engine {
             self.bundle_for(session_id, &worktree, &refs.merge_base_sha, &refs.head_sha)?;
         db::set_session_diff_stats(&conn, session_id, &bundle.stats)?;
         if bundle.map.files.is_empty() {
-            return Err(if bundle.excluded.is_empty() {
+            return Err(if !bundle.excluded.is_empty() {
+                "Only generated, vendored or lock files changed, so there is nothing to analyse."
+                    .to_string()
+            } else if let SessionSource::Commits { count, .. } = &session.source {
+                if *count > 1 {
+                    "These commits don't change any files, so there is nothing to analyse."
+                        .to_string()
+                } else {
+                    "This commit doesn't change any files, so there is nothing to analyse."
+                        .to_string()
+                }
+            } else {
                 format!(
                     "There are no changes between {} and {}.",
                     session.base_ref, session.head_ref
                 )
-            } else {
-                "Only generated, vendored or lock files changed, so there is nothing to analyse."
-                    .to_string()
             });
         }
 
@@ -693,6 +761,8 @@ impl Engine {
                 }
                 refs.head_sha
             }
+            // Commits don't move, so a commit session never goes stale.
+            SessionSource::Commits { .. } => analysed.clone(),
         };
         if !current.is_empty() && current != analysed {
             session.status = SessionStatus::Stale;
@@ -1276,6 +1346,49 @@ impl Engine {
             self.cancel_key(&ask_key(&m.session_id, message_id));
         }
         Ok(())
+    }
+
+    // ── Commits, whole diff, notes ─────────────────────────
+
+    /// Recent commits on a branch, marking where the last commit review of
+    /// that branch ended.
+    pub fn list_commits(
+        &self,
+        repo_id: &str,
+        branch: &str,
+        limit: Option<u32>,
+    ) -> Result<CommitList, String> {
+        let repo = db::get_repo(&self.conn()?, repo_id)?
+            .ok_or_else(|| "That repository no longer exists.".to_string())?;
+        // The fetch can take seconds; no connection is held across it.
+        let mut list = git::list_commits(&repo.path, branch, limit)?;
+        list.last_reviewed_sha = db::last_reviewed_commit(&self.conn()?, repo_id, &list.branch)?
+            .filter(|sha| list.commits.iter().any(|c| &c.sha == sha));
+        Ok(list)
+    }
+
+    /// The session's whole diff, file by file (the Code tab).
+    pub fn read_diff(&self, session_id: &str) -> Result<SessionDiff, String> {
+        let ctx = self.load_ctx(session_id)?;
+        git::build_session_diff(&ctx.worktree, &ctx.merge_base_sha, &ctx.head_sha)
+    }
+
+    pub fn list_notes(&self, session_id: &str) -> Result<Vec<Note>, String> {
+        db::list_notes(&self.conn()?, session_id)
+    }
+
+    pub fn save_note(
+        &self,
+        session_id: &str,
+        id: Option<&str>,
+        body: &str,
+        anchor: Option<&NoteAnchor>,
+    ) -> Result<Note, String> {
+        db::save_note(&self.conn()?, session_id, id, body, anchor)
+    }
+
+    pub fn delete_note(&self, note_id: &str) -> Result<(), String> {
+        db::delete_note(&self.conn()?, note_id)
     }
 
     // ── Questions, excerpts, findings ──────────────────────

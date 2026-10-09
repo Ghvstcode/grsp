@@ -257,7 +257,7 @@ export function seedSessions(): ReviewSession[] {
 
 // ── Code ───────────────────────────────────────────────────
 
-const SVC_CREATE: readonly Row[] = [
+export const SVC_CREATE: readonly Row[] = [
     ["ctx", "def create(self, data):"],
     ["ctx", "    order = Order.from_input(data)"],
     ["del", "    order.status = Status.CONFIRMED"],
@@ -269,7 +269,7 @@ const SVC_CREATE: readonly Row[] = [
     ["ctx", "    self.repo.insert(order)"],
 ];
 
-const POLICY: readonly Row[] = [
+export const POLICY: readonly Row[] = [
     ["add", 'THRESHOLD = Money("10000.00", "EUR")'],
     ["add", ""],
     ["add", "class ApprovalPolicy:"],
@@ -280,7 +280,7 @@ const POLICY: readonly Row[] = [
     ["add", "        return Decision.OK"],
 ];
 
-const NOTIFY: readonly Row[] = [
+export const NOTIFY: readonly Row[] = [
     ["add", "def notify_approvers(order):"],
     ["add", '    approvers = User.objects.with_role("finance_approver")'],
     ["add", "    for user in approvers:"],
@@ -290,7 +290,7 @@ const NOTIFY: readonly Row[] = [
     ["add", '            log.warning("approval email failed", order=order.id)'],
 ];
 
-const APPROVE: readonly Row[] = [
+export const APPROVE: readonly Row[] = [
     ["add", "def approve(self, order_id, approver):"],
     ["add", "    order = self.repo.get(order_id)"],
     ["add", "    if order.status != Status.PENDING_APPROVAL:"],

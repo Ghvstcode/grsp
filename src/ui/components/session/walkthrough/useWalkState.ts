@@ -11,6 +11,8 @@ export interface WalkState {
     showCode: boolean;
     /** Refs to land on once that entry point's walkthrough has loaded. */
     jump?: { entryId: string; refs: CodeRef[] };
+    /** A block to land on (from a note pinned to it), same idea. */
+    jumpBlock?: { entryId: string; blockId: string };
 }
 
 /**
@@ -30,10 +32,25 @@ export function useWalkState() {
             entryId,
             step: 0,
             jump: refs && refs.length > 0 ? { entryId, refs } : undefined,
+            jumpBlock: undefined,
+        }));
+    }, []);
+    const openBlock = useCallback((entryId: string, blockId: string) => {
+        setState((s) => ({
+            ...s,
+            entryId,
+            step: 0,
+            jump: undefined,
+            jumpBlock: { entryId, blockId },
         }));
     }, []);
     const setStep = useCallback((step: number) => {
-        setState((s) => ({ ...s, step, jump: undefined }));
+        setState((s) => ({
+            ...s,
+            step,
+            jump: undefined,
+            jumpBlock: undefined,
+        }));
     }, []);
     const setOption = useCallback((entryId: string, option: number) => {
         setState((s) => ({
@@ -45,7 +62,7 @@ export function useWalkState() {
         setState((s) => ({ ...s, showCode: !s.showCode }));
     }, []);
 
-    return { state, openEntry, setStep, setOption, toggleCode };
+    return { state, openEntry, openBlock, setStep, setOption, toggleCode };
 }
 
 export type WalkController = ReturnType<typeof useWalkState>;

@@ -81,6 +81,7 @@ pub fn run() {
             commands::github_list_open_prs,
             commands::repo_inspect,
             commands::repo_list_branches,
+            commands::repo_list_commits,
             commands::repo_clone,
             commands::session_create,
             commands::session_list,
@@ -96,6 +97,10 @@ pub fn run() {
             commands::ask_send,
             commands::ask_cancel,
             commands::excerpt_read,
+            commands::diff_read,
+            commands::note_list,
+            commands::note_save,
+            commands::note_delete,
             commands::review_update_finding,
             commands::review_post,
         ])

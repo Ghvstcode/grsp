@@ -50,6 +50,29 @@ function repo(id: string, name: string): Repo {
     };
 }
 
+describe("commit sessions", () => {
+    const head = "3f2a91c8d1e4b7a09c5512fe0a6d3b48c7e9f210";
+    const commits = (count: number, branch?: string) =>
+        session({
+            title: "",
+            source: { kind: "commits", branch, base: "a40f7d2", head, count },
+        });
+
+    it("labels one commit by its short SHA and a run by its size", () => {
+        expect(sessionRefLabel(commits(1))).toBe("3f2a91c");
+        expect(sessionRefLabel(commits(5))).toBe("5 commits");
+    });
+
+    it("falls back to a title that says what was picked", () => {
+        expect(sessionTitle(commits(1))).toBe("Untitled commit");
+        expect(sessionTitle(commits(3, "main"))).toBe("Commits on main");
+        expect(sessionTitle(commits(3))).toBe("Untitled commits");
+        expect(sessionTitle({ ...commits(1), title: " Fix the typo " })).toBe(
+            "Fix the typo",
+        );
+    });
+});
+
 describe("sessionStatusLabel", () => {
     it("is In progress for an open session with no posted review", () => {
         expect(sessionStatusLabel(session())).toBe("In progress");

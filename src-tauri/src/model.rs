@@ -340,8 +340,26 @@ pub struct RepoInspection {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum SessionSource {
-    Pr { number: u64, url: String },
-    Branches { base: String, head: String },
+    Pr {
+        number: u64,
+        url: String,
+    },
+    Branches {
+        base: String,
+        head: String,
+    },
+    /// One commit or a run of commits, with no PR. `base` is the parent of
+    /// the oldest commit reviewed (git's empty tree for a root commit),
+    /// `head` the newest; both are full SHAs.
+    Commits {
+        /// The branch they were picked from, for display.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        branch: Option<String>,
+        base: String,
+        head: String,
+        /// Number of commits in base..head.
+        count: u32,
+    },
 }
 
 impl SessionSource {
@@ -352,8 +370,12 @@ impl SessionSource {
     pub fn pr_number(&self) -> Option<u64> {
         match self {
             SessionSource::Pr { number, .. } => Some(*number),
-            SessionSource::Branches { .. } => None,
+            SessionSource::Branches { .. } | SessionSource::Commits { .. } => None,
         }
+    }
+
+    pub fn is_commits(&self) -> bool {
+        matches!(self, SessionSource::Commits { .. })
     }
 }
 
@@ -518,6 +540,16 @@ pub enum NewSessionInput {
         base: String,
         head: String,
     },
+    /// Review commits. `from` is the oldest commit to include; without it
+    /// `head` is reviewed on its own. The base is `from`'s parent.
+    Commits {
+        repo_id: String,
+        #[serde(default)]
+        branch: Option<String>,
+        head: String,
+        #[serde(default)]
+        from: Option<String>,
+    },
 }
 
 /// Returned (JSON-encoded) by session_create when the URL's repo hasn't been added.
@@ -538,6 +570,112 @@ impl RepoNotAddedError {
             name: name.to_string(),
         }
     }
+}
+
+// ── Commits (commit reviews) ───────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitInfo {
+    pub sha: String,
+    pub short_sha: String,
+    /// First line of the message.
+    pub subject: String,
+    /// The rest of the message; may be empty.
+    pub body: String,
+    pub author: String,
+    /// ISO 8601, with the author's UTC offset.
+    pub authored_at: String,
+    pub files_changed: u32,
+    pub added: u32,
+    pub removed: u32,
+    pub is_merge: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitList {
+    pub branch: String,
+    /// Newest first.
+    pub commits: Vec<CommitInfo>,
+    /// Head of the most recent commit review on this branch, when it is
+    /// still in `commits`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_reviewed_sha: Option<String>,
+    /// True when the fetch from the remote failed and the list is local.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offline: Option<bool>,
+}
+
+// ── Full diff (Code tab) ───────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffFilePatch {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub old_path: Option<String>,
+    pub status: FileStatus,
+    pub added: u32,
+    pub removed: u32,
+    pub binary: bool,
+    /// This file's unified diff, starting at its `diff --git` line. Empty
+    /// for binary files.
+    pub patch: String,
+    /// The patch was cut off because the file's diff is very large.
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDiff {
+    pub files: Vec<DiffFilePatch>,
+    /// Vendored, generated and lock files left out (SPEC §2.2).
+    pub excluded_files: u32,
+}
+
+// ── Notes ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DiffSide {
+    Old,
+    New,
+}
+
+/// Where a note is pinned. No anchor = a note on the whole review.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "lowercase",
+    rename_all_fields = "camelCase"
+)]
+pub enum NoteAnchor {
+    Line {
+        file: String,
+        line: u32,
+        side: DiffSide,
+    },
+    Block {
+        entry_point_id: String,
+        block_id: String,
+        label: String,
+    },
+}
+
+/// A private note. Notes never leave the machine unless exported.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Note {
+    pub id: String,
+    pub session_id: String,
+    pub body: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<NoteAnchor>,
+    /// The head the note was written against.
+    pub head_sha: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // ── Git facts ──────────────────────────────────────────────
@@ -1537,6 +1675,83 @@ mod tests {
             }),
             json!({"kind": "pr", "number": 4, "url": "u"})
         );
+    }
+
+    #[test]
+    fn commit_review_types_match_the_ts_contract() {
+        assert_eq!(
+            json!(SessionSource::Commits {
+                branch: Some("main".into()),
+                base: "b".into(),
+                head: "h".into(),
+                count: 3
+            }),
+            json!({"kind": "commits", "branch": "main", "base": "b", "head": "h", "count": 3})
+        );
+        assert_eq!(
+            json!(SessionSource::Commits {
+                branch: None,
+                base: "b".into(),
+                head: "h".into(),
+                count: 1
+            }),
+            json!({"kind": "commits", "base": "b", "head": "h", "count": 1})
+        );
+        let i: NewSessionInput =
+            serde_json::from_value(json!({"kind": "commits", "repoId": "r1", "head": "abc"}))
+                .unwrap();
+        assert_eq!(
+            i,
+            NewSessionInput::Commits {
+                repo_id: "r1".into(),
+                branch: None,
+                head: "abc".into(),
+                from: None
+            }
+        );
+        let i: NewSessionInput = serde_json::from_value(
+            json!({"kind": "commits", "repoId": "r1", "branch": "main", "head": "abc", "from": "def"}),
+        )
+        .unwrap();
+        assert!(matches!(i, NewSessionInput::Commits { from: Some(f), .. } if f == "def"));
+
+        let line: NoteAnchor = serde_json::from_value(
+            json!({"kind": "line", "file": "a.txt", "line": 4, "side": "old"}),
+        )
+        .unwrap();
+        assert_eq!(
+            line,
+            NoteAnchor::Line {
+                file: "a.txt".into(),
+                line: 4,
+                side: DiffSide::Old
+            }
+        );
+        assert_eq!(
+            json!(NoteAnchor::Block {
+                entry_point_id: "ep1".into(),
+                block_id: "b2".into(),
+                label: "save".into()
+            }),
+            json!({"kind": "block", "entryPointId": "ep1", "blockId": "b2", "label": "save"})
+        );
+        let patch = serde_json::to_value(DiffFilePatch {
+            path: "b.txt".into(),
+            old_path: Some("a.txt".into()),
+            status: FileStatus::Renamed,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(patch["oldPath"], "a.txt");
+        assert_eq!(patch["status"], "renamed");
+        assert_eq!(
+            serde_json::to_value(CommitList::default()).unwrap(),
+            json!({"branch": "", "commits": []})
+        );
+        let c = serde_json::to_value(CommitInfo::default()).unwrap();
+        for key in ["shortSha", "authoredAt", "filesChanged", "isMerge"] {
+            assert!(c.get(key).is_some(), "{key}");
+        }
     }
 
     #[test]

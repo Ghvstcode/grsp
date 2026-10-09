@@ -1,6 +1,6 @@
 //! Engine tests: session lifecycle, persistence, events and cancellation in
-//! branch-pair mode, with a scripted agent, a temp database and a temp repo.
-//! No network and no agent CLI.
+//! branch-pair and commit mode, with a scripted agent, a temp database and a
+//! temp repo. No network and no agent CLI.
 
 mod common;
 
@@ -636,4 +636,385 @@ async fn a_failed_preparation_is_a_session_error_with_a_plain_message() {
     .await;
     assert!(session(&h, &s.id).error.unwrap().contains("no-such-branch"));
     assert!(h.engine.list_analyses(&s.id).unwrap().is_empty());
+}
+
+// ── Commit reviews ─────────────────────────────────────────
+
+fn commits(head: &str, from: Option<&str>) -> NewSessionInput {
+    NewSessionInput::Commits {
+        repo_id: "r1".into(),
+        branch: Some("feature".into()),
+        head: head.into(),
+        from: from.map(String::from),
+    }
+}
+
+fn discovery_of(h: &Harness, sid: &str) -> DiscoveryResult {
+    let list = h.engine.list_analyses(sid).unwrap();
+    serde_json::from_value(
+        list.iter()
+            .find(|a| a.kind == "discovery")
+            .unwrap()
+            .result
+            .clone()
+            .unwrap(),
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_commit_session_prepares_then_runs_discovery_and_questions() {
+    let h = harness(&[GOOD_DISCOVERY, QUESTIONS]);
+    let head = h.fx.head_sha.clone();
+    let s = h.engine.create_session(commits(&head, None)).await.unwrap();
+
+    // Everything git knows is on the session before it is prepared.
+    assert_eq!(s.status, SessionStatus::Preparing);
+    assert_eq!(
+        s.source,
+        SessionSource::Commits {
+            branch: Some("feature".into()),
+            base: h.fx.base_sha.clone(),
+            head: head.clone(),
+            count: 1,
+        }
+    );
+    assert_eq!(s.title, "require approval");
+    assert_eq!(
+        s.description, "",
+        "a subject on its own is not a description"
+    );
+    assert_eq!(s.author, "grsp-test");
+    assert_eq!(s.head_ref, "feature");
+    assert_eq!(s.base_ref, &h.fx.base_sha[..7]);
+    assert_eq!(s.head_sha.as_deref(), Some(head.as_str()));
+    assert_eq!(s.merge_base_sha.as_deref(), Some(h.fx.base_sha.as_str()));
+
+    let sid = s.id.clone();
+    wait_for("questions", || {
+        status_of(&h, &sid, "questions") == Some(AnalysisStatus::Done)
+    })
+    .await;
+    let ready = session(&h, &sid);
+    assert_eq!(ready.status, SessionStatus::Ready);
+    assert_eq!(ready.error, None);
+    assert_eq!(ready.source, s.source);
+    // services.py, policy.py and legacy.py; the lock file is excluded.
+    assert_eq!(ready.files_changed, 3);
+    assert_eq!(ready.agent_passes, 2);
+    assert!(h
+        .data
+        .join("worktrees")
+        .join(&sid)
+        .join("orders/policy.py")
+        .is_file());
+
+    // No discussion for commits; no review until asked.
+    let list = h.engine.list_analyses(&sid).unwrap();
+    let kinds: BTreeSet<&str> = list.iter().map(|a| a.kind.as_str()).collect();
+    assert_eq!(kinds, BTreeSet::from(["discovery", "questions"]));
+    assert!(list.iter().all(|a| a.head_sha == head));
+
+    // The agent claimed a mismatch, but a bare subject line gives it nothing
+    // to contradict.
+    let d = discovery_of(&h, &sid);
+    assert_eq!(d.entry_points.len(), 2);
+    assert!(d.description_empty);
+    assert!(d.mismatches.is_empty());
+
+    let steps: Vec<String> = h
+        .events
+        .sessions
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|e| e.progress.clone())
+        .collect();
+    assert_eq!(steps[0], format!("Reading commit {}", &head[..7]));
+    assert!(steps[1].starts_with("Creating a read-only worktree at "));
+    assert_eq!(steps[2], "Working out what changed");
+
+    // The same commit again is the same session, by SHA, short SHA or ref,
+    // and whichever branch it is opened from.
+    for input in [
+        commits(&head, None),
+        commits(&head[..10], None),
+        commits("feature", Some(&head)),
+        NewSessionInput::Commits {
+            repo_id: "r1".into(),
+            branch: None,
+            head: head.clone(),
+            from: None,
+        },
+    ] {
+        assert_eq!(h.engine.create_session(input).await.unwrap().id, sid);
+    }
+    assert_eq!(
+        db::list_sessions(&h.engine.conn().unwrap()).unwrap().len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn a_commit_session_never_goes_stale_and_cannot_post_or_discuss() {
+    let h = harness(&[GOOD_DISCOVERY, QUESTIONS, REVIEW_REPLY]);
+    let head = h.fx.head_sha.clone();
+    let sid = h
+        .engine
+        .create_session(commits(&head, None))
+        .await
+        .unwrap()
+        .id;
+    wait_for("questions", || {
+        status_of(&h, &sid, "questions") == Some(AnalysisStatus::Done)
+    })
+    .await;
+
+    // The branch moves on. The commits under review don't.
+    write(&h.fx.dir, "orders/notes.py", "NOTE = 1\n");
+    git_in(&h.fx.dir, &["add", "-A"]);
+    git_in(&h.fx.dir, &["commit", "-q", "-m", "more"]);
+    let (e, s) = (h.engine.clone(), sid.clone());
+    h.engine.open_session(&sid).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let after = db::get_session(&e.conn().unwrap(), &s)
+        .unwrap()
+        .unwrap()
+        .session;
+    assert_eq!(after.status, SessionStatus::Ready);
+    assert_eq!(after.new_commits, 0);
+    assert_eq!(after.head_sha.as_deref(), Some(head.as_str()));
+    assert_eq!(after.agent_passes, 2, "opening runs no agent");
+
+    assert!(h
+        .engine
+        .start_analysis(&sid, "discussion")
+        .unwrap_err()
+        .contains("only available for pull requests"));
+
+    // A review can be run, but there is nowhere to post it.
+    h.engine.run_analysis(&sid, "review", true).await;
+    assert_eq!(status_of(&h, &sid, "review"), Some(AnalysisStatus::Done));
+    let err = h
+        .engine
+        .post_review(
+            &sid,
+            PostReviewInput {
+                event: ReviewEvent::Comment,
+                body: "x".into(),
+            },
+        )
+        .await
+        .unwrap_err();
+    assert!(err.contains("only available for pull requests"), "{err}");
+    assert!(err.contains("reviews commits"), "{err}");
+    assert_eq!(session(&h, &sid).posted_review, None);
+}
+
+#[tokio::test]
+async fn a_run_of_commits_from_the_root_is_one_session() {
+    let h = harness(&[GOOD_DISCOVERY, QUESTIONS]);
+    let (base, head) = (h.fx.base_sha.clone(), h.fx.head_sha.clone());
+    let s = h
+        .engine
+        .create_session(commits(&head, Some(&base)))
+        .await
+        .unwrap();
+    let SessionSource::Commits {
+        base: source_base,
+        count,
+        ..
+    } = &s.source
+    else {
+        panic!("not a commit session: {:?}", s.source);
+    };
+    assert_eq!(*count, 2);
+    // `base` is the root commit, so the run is diffed against the empty tree.
+    assert_eq!(source_base, "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+    assert_eq!(s.title, "2 commits on feature");
+    assert_eq!(s.description, "- base\n- require approval");
+    assert_eq!(s.author, "grsp-test");
+
+    let sid = s.id.clone();
+    wait_for("questions", || {
+        status_of(&h, &sid, "questions") == Some(AnalysisStatus::Done)
+    })
+    .await;
+    let ready = session(&h, &sid);
+    assert_eq!(ready.status, SessionStatus::Ready, "{:?}", ready.error);
+    // Every file in the repository at head except the lock file: api, imports,
+    // models, policy, services.
+    assert_eq!(ready.files_changed, 5);
+    // A list of subjects is a description, so mismatches are not thrown away.
+    assert!(!discovery_of(&h, &sid).description_empty);
+
+    // A different run ending at the same commit is its own session.
+    let single = h.engine.create_session(commits(&head, None)).await.unwrap();
+    assert_ne!(single.id, sid);
+    wait_for("second session settles", || {
+        session(&h, &single.id).status != SessionStatus::Preparing
+            && status_of(&h, &single.id, "discovery")
+                .is_some_and(|st| st != AnalysisStatus::Running)
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn commits_that_cannot_be_reviewed_together_are_rejected_up_front() {
+    let h = harness(&[]);
+    // `from` is newer than `head`.
+    let err = h
+        .engine
+        .create_session(commits(&h.fx.base_sha, Some(&h.fx.head_sha)))
+        .await
+        .unwrap_err();
+    assert!(err.contains("isn't in the history of"), "{err}");
+    let err = h
+        .engine
+        .create_session(commits("0123456789abcdef", None))
+        .await
+        .unwrap_err();
+    assert!(err.contains("Couldn't find commit"), "{err}");
+    let err = h
+        .engine
+        .create_session(NewSessionInput::Commits {
+            repo_id: "gone".into(),
+            branch: None,
+            head: h.fx.head_sha.clone(),
+            from: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(err.contains("repository no longer exists"), "{err}");
+    // Nothing was stored for any of them.
+    assert!(db::list_sessions(&h.engine.conn().unwrap())
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn the_commit_list_marks_where_the_last_review_of_the_branch_ended() {
+    let h = harness(&[GOOD_DISCOVERY, QUESTIONS]);
+    let (base, head) = (h.fx.base_sha.clone(), h.fx.head_sha.clone());
+
+    let list = h.engine.list_commits("r1", "feature", None).unwrap();
+    assert_eq!(list.branch, "feature");
+    let shas: Vec<&str> = list.commits.iter().map(|c| c.sha.as_str()).collect();
+    assert_eq!(shas, [head.as_str(), base.as_str()]);
+    assert_eq!(list.commits[0].subject, "require approval");
+    // services.py, policy.py, legacy.py and the lock file.
+    assert_eq!(list.commits[0].files_changed, 4);
+    assert_eq!(list.last_reviewed_sha, None);
+    assert_eq!(list.offline, None);
+
+    let sid = h
+        .engine
+        .create_session(commits(&head, None))
+        .await
+        .unwrap()
+        .id;
+    wait_for("questions", || {
+        status_of(&h, &sid, "questions") == Some(AnalysisStatus::Done)
+    })
+    .await;
+    let reviewed = |branch: &str, limit: Option<u32>| {
+        h.engine
+            .list_commits("r1", branch, limit)
+            .unwrap()
+            .last_reviewed_sha
+    };
+    assert_eq!(reviewed("feature", None), Some(head.clone()));
+    // Reviews are remembered per branch.
+    assert_eq!(reviewed("main", None), None);
+
+    // New commits land above the reviewed one.
+    write(&h.fx.dir, "orders/notes.py", "NOTE = 1\n");
+    git_in(&h.fx.dir, &["add", "-A"]);
+    git_in(&h.fx.dir, &["commit", "-q", "-m", "more"]);
+    let list = h.engine.list_commits("r1", "feature", None).unwrap();
+    assert_eq!(list.commits.len(), 3);
+    assert_eq!(list.commits[1].sha, head);
+    assert_eq!(list.last_reviewed_sha, Some(head.clone()));
+    // …and it is only reported while it is still in the list.
+    assert_eq!(reviewed("feature", Some(1)), None);
+
+    h.engine.archive_session(&sid).await.unwrap();
+    assert_eq!(reviewed("feature", None), None);
+    assert!(h.engine.list_commits("nope", "feature", None).is_err());
+}
+
+#[tokio::test]
+async fn the_whole_diff_and_notes_are_served_for_a_session() {
+    let h = harness(&[GOOD_DISCOVERY, QUESTIONS]);
+    let head = h.fx.head_sha.clone();
+    let sid = h
+        .engine
+        .create_session(commits(&head, None))
+        .await
+        .unwrap()
+        .id;
+    wait_for("questions", || {
+        status_of(&h, &sid, "questions") == Some(AnalysisStatus::Done)
+    })
+    .await;
+
+    let diff = h.engine.read_diff(&sid).unwrap();
+    let mut paths: Vec<&str> = diff.files.iter().map(|f| f.path.as_str()).collect();
+    paths.sort_unstable();
+    assert_eq!(
+        paths,
+        ["orders/legacy.py", "orders/policy.py", "orders/services.py"]
+    );
+    assert_eq!(diff.excluded_files, 1, "the lock file");
+    let services = diff
+        .files
+        .iter()
+        .find(|f| f.path == "orders/services.py")
+        .unwrap();
+    assert!(services
+        .patch
+        .starts_with("diff --git a/orders/services.py b/orders/services.py\n"));
+    assert!(services.patch.contains("+    if requires_approval(order):"));
+    assert!(!services.truncated && !services.binary);
+    let stats = session(&h, &sid);
+    assert_eq!(diff.files.len() as u32, stats.files_changed);
+    assert_eq!(
+        diff.files.iter().map(|f| f.added).sum::<u32>(),
+        stats.lines_added
+    );
+    assert_eq!(
+        diff.files.iter().map(|f| f.removed).sum::<u32>(),
+        stats.lines_removed
+    );
+    assert!(h.engine.read_diff("missing").is_err());
+
+    // Notes are pinned to the head they were written against.
+    let anchor = NoteAnchor::Line {
+        file: "orders/services.py".into(),
+        line: 7,
+        side: DiffSide::New,
+    };
+    let note = h
+        .engine
+        .save_note(&sid, None, " What about refunds? ", Some(&anchor))
+        .unwrap();
+    assert_eq!(note.body, "What about refunds?");
+    assert_eq!(note.head_sha, head);
+    assert_eq!(note.anchor, Some(anchor));
+    let general = h
+        .engine
+        .save_note(&sid, None, "Overall fine.", None)
+        .unwrap();
+    let edited = h
+        .engine
+        .save_note(&sid, Some(&note.id), "Refunds are out of scope.", None)
+        .unwrap();
+    assert_eq!(edited.id, note.id);
+    assert!(h.engine.save_note(&sid, None, "  ", None).is_err());
+    let listed = h.engine.list_notes(&sid).unwrap();
+    assert_eq!(listed, vec![edited, general.clone()]);
+    h.engine.delete_note(&note.id).unwrap();
+    assert_eq!(h.engine.list_notes(&sid).unwrap(), vec![general]);
+    // Notes cost no agent passes.
+    assert_eq!(session(&h, &sid).agent_passes, 2);
 }

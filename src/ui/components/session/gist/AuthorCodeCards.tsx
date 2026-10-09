@@ -4,16 +4,22 @@ import { AnalysisSection, SkeletonLine } from "../shared/AnalysisSection";
 import { InlineText } from "../shared/InlineText";
 import { Markdown } from "../shared/Markdown";
 import { SectionLabel } from "../shared/SectionLabel";
-import { honestyLine } from "../lib/status";
+import { honestyLine, type SourceWording } from "../lib/status";
 import { commentPreview, wordCountLabel } from "../lib/text";
 
-function AuthorSays({ description }: { description: string }) {
+function AuthorSays({
+    description,
+    wording,
+}: {
+    description: string;
+    wording: SourceWording;
+}) {
     const [open, setOpen] = useState(false);
     const empty = description.trim() === "";
     return (
         <div className="flex flex-col gap-3 rounded-[10px] border px-[22px] py-5">
             <div className="flex items-center justify-between">
-                <SectionLabel>Author says</SectionLabel>
+                <SectionLabel>{wording.authorLabel}</SectionLabel>
                 {!empty && (
                     <span className="text-[11px] text-muted-foreground">
                         {wordCountLabel(description)}
@@ -22,7 +28,7 @@ function AuthorSays({ description }: { description: string }) {
             </div>
             {empty ? (
                 <p className="m-0 text-muted-foreground">
-                    No description to compare against.
+                    {wording.noDescription}
                 </p>
             ) : (
                 <>
@@ -39,9 +45,7 @@ function AuthorSays({ description }: { description: string }) {
                         aria-expanded={open}
                         className="h-8 self-start text-[13px] font-medium underline underline-offset-[3px]"
                     >
-                        {open
-                            ? "Collapse description"
-                            : "Read full description"}
+                        {open ? wording.collapse : wording.expand}
                     </button>
                 </>
             )}
@@ -51,21 +55,27 @@ function AuthorSays({ description }: { description: string }) {
 
 interface AuthorCodeCardsProps {
     description: string;
+    /** Labels for the left card: a PR description or commit messages. */
+    wording: SourceWording;
     discovery: Analysis<DiscoveryResult> | undefined;
     onRetry: () => void;
     onCancel: () => void;
 }
 
-/** "Author says" (the PR description) next to "Code does" (the agent's read). */
+/**
+ * "Author says" (the PR description, or the commit messages of a commit
+ * session) next to "Code does" (the agent's read).
+ */
 export function AuthorCodeCards({
     description,
+    wording,
     discovery,
     onRetry,
     onCancel,
 }: AuthorCodeCardsProps) {
     return (
         <div className="grid grid-cols-2 items-start gap-[18px]">
-            <AuthorSays description={description} />
+            <AuthorSays description={description} wording={wording} />
             <div className="flex flex-col gap-3 rounded-[10px] border border-foreground px-[22px] py-5">
                 <SectionLabel className="text-foreground">
                     Code does

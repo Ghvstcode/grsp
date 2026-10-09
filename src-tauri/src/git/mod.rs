@@ -10,11 +10,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
 
+mod commits;
 mod diff;
 mod repo;
 mod url;
 mod worktree;
 
+pub use commits::*;
 pub use diff::*;
 pub use repo::*;
 pub use url::*;
@@ -28,6 +30,8 @@ pub const LARGE_PR_FILES: u32 = 60;
 pub const LARGE_PR_LINES: u32 = 3000;
 /// Per-file raw diff cap for the context pack (SPEC §4.2).
 pub const RAW_DIFF_MAX_LINES: usize = 400;
+/// Per-file cap on a patch returned to the Code tab (`diff_read`).
+pub const PATCH_MAX_LINES: usize = 3000;
 /// Worktrees of sessions untouched this long are pruned (SPEC §2.4).
 pub const WORKTREE_MAX_AGE_DAYS: i64 = 14;
 
@@ -162,6 +166,61 @@ pub(crate) fn run_git_raw(dir: &Path, args: &[&str]) -> GitResult<GitOutput> {
         ok: out.status.success(),
         stdout: String::from_utf8_lossy(&out.stdout).to_string(),
         stderr: String::from_utf8_lossy(&out.stderr).trim().to_string(),
+    })
+}
+
+/// Like `run_git_raw`, but gives up (and kills git) after `timeout`. For
+/// best-effort network calls whose output is small.
+pub(crate) fn run_git_timeout(
+    dir: &Path,
+    args: &[&str],
+    timeout: std::time::Duration,
+) -> GitResult<GitOutput> {
+    use std::io::Read;
+    use std::process::Stdio;
+
+    if !dir.is_dir() {
+        return Err(format!("Folder not found: {}", dir.display()));
+    }
+    let mut child = git_cmd(dir)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Couldn't run git: {e}"))?;
+    let deadline = std::time::Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if std::time::Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "git {} timed out",
+                    args.first().copied().unwrap_or("")
+                ));
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(20)),
+            Err(e) => {
+                let _ = child.kill();
+                return Err(format!("Couldn't run git: {e}"));
+            }
+        }
+    };
+    fn drain(pipe: Option<impl Read>) -> String {
+        let mut buf = Vec::new();
+        if let Some(mut p) = pipe {
+            let _ = p.read_to_end(&mut buf);
+        }
+        String::from_utf8_lossy(&buf).to_string()
+    }
+    let stdout = drain(child.stdout.take());
+    let stderr = drain(child.stderr.take());
+    Ok(GitOutput {
+        ok: status.success(),
+        stdout,
+        stderr: stderr.trim().to_string(),
     })
 }
 

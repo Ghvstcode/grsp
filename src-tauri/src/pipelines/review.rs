@@ -173,6 +173,12 @@ pub fn build_payload(
 
 /// Rules checked before any network call (SPEC §5.6 "Errors").
 pub fn check_can_post(session: &ReviewSession, event: ReviewEvent) -> Result<(), String> {
+    if session.source.is_commits() {
+        return Err(
+            "Posting is only available for pull requests. This session reviews commits, so there is no pull request to post to."
+                .to_string(),
+        );
+    }
     if !session.source.is_pr() {
         return Err(
             "Posting is only available for pull requests. This session compares two branches."
@@ -368,6 +374,16 @@ mod tests {
         let mut s = session("t", "d");
         // Branch-pair sessions can't post.
         assert!(check_can_post(&s, ReviewEvent::Comment).is_err());
+        // Neither can commit sessions, and the message says why.
+        s.source = SessionSource::Commits {
+            branch: Some("main".into()),
+            base: "b".repeat(40),
+            head: "a".repeat(40),
+            count: 1,
+        };
+        let err = check_can_post(&s, ReviewEvent::Comment).unwrap_err();
+        assert!(err.contains("only available for pull requests"), "{err}");
+        assert!(err.contains("reviews commits"), "{err}");
         s.source = SessionSource::Pr {
             number: 4,
             url: "u".into(),

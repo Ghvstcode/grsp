@@ -131,7 +131,11 @@ export function AskPanel({ session, suggestions }: AskPanelProps) {
                 <span className="text-[15px] font-semibold">
                     {session.source.kind === "pr"
                         ? "Ask about this PR"
-                        : "Ask about this change"}
+                        : session.source.kind === "commits"
+                          ? session.source.count === 1
+                              ? "Ask about this commit"
+                              : "Ask about these commits"
+                          : "Ask about this change"}
                 </span>
                 <form onSubmit={onSubmit} className="flex gap-2">
                     <label htmlFor="grsp-ask" className="sr-only">

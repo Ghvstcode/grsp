@@ -16,6 +16,14 @@ export const FIXTURE_VARIANTS = [
     "nodiscussion",
     /** Branch-pair session: no PR number, CI, discussion or posting. */
     "branches",
+    /** Commit session: one commit, no PR number, CI, discussion or posting. */
+    "commit",
+    /** Commit session over a run of four commits. */
+    "commits",
+    /** The change is a one-line fix (the "Code tab may be all you need" hint). */
+    "tiny",
+    /** The commit list couldn't reach the remote and shows local commits. */
+    "offline",
     /** The viewer wrote the PR: Approve / Request changes are disabled. */
     "ownpr",
     /** Nothing has been analysed yet; sections stream in on open. */

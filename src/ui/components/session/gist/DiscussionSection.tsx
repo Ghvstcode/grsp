@@ -242,8 +242,11 @@ function Thread({
 
 interface DiscussionSectionProps {
     sessionId: string;
-    /** Branch-pair sessions have no PR, so no discussion. */
-    isPr: boolean;
+    /**
+     * Why there is no discussion (branch pairs and commits have no PR);
+     * undefined for pull requests.
+     */
+    unavailable: string | undefined;
     discussion: Analysis<DiscussionResult> | undefined;
     onRetry: () => void;
     onCancel: () => void;
@@ -252,11 +255,12 @@ interface DiscussionSectionProps {
 /** "Discussion on GitHub": a one-line digest that expands into the threads. */
 export function DiscussionSection({
     sessionId,
-    isPr,
+    unavailable,
     discussion,
     onRetry,
     onCancel,
 }: DiscussionSectionProps) {
+    const isPr = unavailable === undefined;
     const [open, setOpen] = useState(false);
     const state = isPr ? sectionState(discussion) : "done";
     const result = isPr && state === "done" ? discussion?.result : undefined;
@@ -265,8 +269,7 @@ export function DiscussionSection({
 
     let line: string;
     if (!isPr) {
-        line =
-            "There's no discussion for a branch comparison. Open a pull request to see its threads here.";
+        line = unavailable;
     } else if (state === "running") {
         line = discussion?.progress ?? "Reading the comments";
     } else if (state === "waiting") {

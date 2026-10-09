@@ -1,14 +1,20 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Check } from "lucide-react";
-import type { CodeRef, ReviewSession } from "@core/types/grsp";
+import type { CodeRef, NoteAnchor, ReviewSession } from "@core/types/grsp";
 import { useAnalyses } from "@core/api/useAnalysis";
+import { useNotes } from "@core/api/useNotes";
+import { useRepos } from "@core/api/useRepos";
 import {
     errorMessage,
     useRefreshSession,
     useSession,
 } from "@core/api/useSession";
+import { CodeJumpContext, type CodeTarget } from "./code/CodeJumpContext";
+import { CodeTab } from "./code/CodeTab";
 import { GistTab } from "./gist/GistTab";
+import { sourceWording } from "./lib/status";
 import { plural } from "./lib/text";
+import { NotesPanel } from "./notes/NotesPanel";
 import { ReviewTab } from "./review/ReviewTab";
 import { SessionHeader, type SessionTab } from "./SessionHeader";
 import { SectionError } from "./shared/AnalysisSection";
@@ -36,9 +42,7 @@ function Preparing({
     return (
         <div className="flex grow flex-col gap-4 px-9 pt-8">
             <h2 className="m-0 text-[15px] font-semibold">
-                {session.source.kind === "pr"
-                    ? "Getting this pull request ready"
-                    : "Getting these branches ready"}
+                {sourceWording(session).preparing}
             </h2>
             <div className="flex flex-col gap-1.5">
                 {done.map((line) => (
@@ -98,6 +102,26 @@ function SessionScreen({ sessionId }: { sessionId: string }) {
     const settings = useSessionSettings();
     const walk = useWalkState();
     const [tab, setTab] = useState<SessionTab>("gist");
+    const { data: repos } = useRepos();
+    const notes = useNotes(sessionId, session?.headSha);
+    const [notesOpen, setNotesOpen] = useState(false);
+    // Where the Code tab is; `nonce` makes a repeated jump scroll again.
+    const [codeTarget, setCodeTarget] = useState<
+        (CodeTarget & { nonce: number }) | undefined
+    >(undefined);
+    const showCode = useCallback((target: CodeTarget) => {
+        setCodeTarget((current) => ({
+            ...target,
+            nonce: (current?.nonce ?? 0) + 1,
+        }));
+    }, []);
+    const jumpToCode = useCallback(
+        (target: CodeTarget) => {
+            showCode(target);
+            setTab("code");
+        },
+        [showCode],
+    );
 
     if (!session) {
         return (
@@ -126,15 +150,32 @@ function SessionScreen({ sessionId }: { sessionId: string }) {
         walk.openEntry(entryPointId, refs);
         setTab("walkthrough");
     };
+    const repo = repos?.find((r) => r.id === session.repoId);
+    const jumpToAnchor = (anchor: NoteAnchor) => {
+        if (anchor.kind === "line") {
+            jumpToCode({
+                file: anchor.file,
+                line: anchor.line,
+                side: anchor.side,
+            });
+        } else {
+            walk.openBlock(anchor.entryPointId, anchor.blockId);
+            setTab("walkthrough");
+        }
+    };
 
     return (
         <div className={shell}>
             <SessionHeader
                 session={session}
+                repo={repo}
                 mismatchCount={mismatchCount}
                 tab={tab}
                 onTab={setTab}
                 showTabs={usable}
+                notesCount={notes.notes.length}
+                notesOpen={notesOpen}
+                onToggleNotes={() => setNotesOpen((open) => !open)}
             />
             {session.status === "stale" && (
                 <StaleBar
@@ -161,24 +202,50 @@ function SessionScreen({ sessionId }: { sessionId: string }) {
                         This session is archived.
                     </p>
                 )}
-                {usable && tab === "gist" && (
-                    <GistTab
+                <CodeJumpContext.Provider value={jumpToCode}>
+                    {usable && tab === "gist" && (
+                        <GistTab
+                            session={session}
+                            analyses={analyses}
+                            settings={settings}
+                            onWalk={openWalk}
+                            showAsk={!notesOpen}
+                        />
+                    )}
+                    {usable && tab === "walkthrough" && (
+                        <WalkthroughTab
+                            session={session}
+                            analyses={analyses}
+                            settings={settings}
+                            walk={walk}
+                            notes={notes}
+                            onOpenCode={() => setTab("code")}
+                        />
+                    )}
+                    {usable && tab === "review" && (
+                        <ReviewTab session={session} settings={settings} />
+                    )}
+                    {usable && tab === "code" && (
+                        <CodeTab
+                            session={session}
+                            target={codeTarget}
+                            onTarget={showCode}
+                            notes={notes}
+                        />
+                    )}
+                </CodeJumpContext.Provider>
+                {usable && notesOpen && (
+                    <NotesPanel
                         session={session}
-                        analyses={analyses}
-                        settings={settings}
-                        onWalk={openWalk}
+                        repoName={
+                            repo?.remote
+                                ? `${repo.remote.owner}/${repo.remote.name}`
+                                : repo?.name
+                        }
+                        notes={notes}
+                        onClose={() => setNotesOpen(false)}
+                        onJump={jumpToAnchor}
                     />
-                )}
-                {usable && tab === "walkthrough" && (
-                    <WalkthroughTab
-                        session={session}
-                        analyses={analyses}
-                        settings={settings}
-                        walk={walk}
-                    />
-                )}
-                {usable && tab === "review" && (
-                    <ReviewTab session={session} settings={settings} />
                 )}
             </div>
             <footer className="flex h-8 shrink-0 items-center gap-2 border-t px-9 text-[11px] text-muted-foreground">
@@ -202,7 +269,8 @@ function SessionScreen({ sessionId }: { sessionId: string }) {
 }
 
 /**
- * One review session: PR header, then Gist · Walkthrough · Review. The shell
+ * One review session: header, then Gist · Walkthrough · Review · Code, with
+ * the reader's notes on the right of any of them. The shell
  * renders this in the main area for the selected session.
  */
 export function SessionView({ sessionId }: { sessionId: string }) {
