@@ -127,7 +127,20 @@ export interface RepoInspection {
 
 export type SessionSource =
     | { kind: "pr"; number: number; url: string }
-    | { kind: "branches"; base: string; head: string };
+    | { kind: "branches"; base: string; head: string }
+    /**
+     * One commit or a run of commits, with no PR. `base` is the parent of
+     * the oldest commit reviewed, `head` the newest; both are full SHAs.
+     */
+    | {
+          kind: "commits";
+          /** The branch they were picked from, for display. */
+          branch?: string;
+          base: string;
+          head: string;
+          /** Number of commits in base..head. */
+          count: number;
+      };
 
 export type SessionStatus =
     | "preparing"
@@ -183,13 +196,98 @@ export interface ReviewSession {
 export type NewSessionInput =
     | { kind: "url"; url: string }
     | { kind: "pr"; repoId: string; number: number }
-    | { kind: "branches"; repoId: string; base: string; head: string };
+    | { kind: "branches"; repoId: string; base: string; head: string }
+    /**
+     * Review commits. `from` is the oldest commit to include; omit it to
+     * review `head` on its own. The core resolves the base to from's parent.
+     */
+    | {
+          kind: "commits";
+          repoId: string;
+          branch?: string;
+          head: string;
+          from?: string;
+      };
 
 /** Returned by session_create when the URL's repo hasn't been added. */
 export interface RepoNotAddedError {
     code: "repo_not_added";
     owner: string;
     name: string;
+}
+
+// ── Commits (SPEC addendum: commit reviews) ────────────────
+
+export interface CommitInfo {
+    sha: string;
+    shortSha: string;
+    /** First line of the message. */
+    subject: string;
+    /** The rest of the message; may be empty. */
+    body: string;
+    author: string;
+    authoredAt: string;
+    filesChanged: number;
+    added: number;
+    removed: number;
+    isMerge: boolean;
+}
+
+export interface CommitList {
+    branch: string;
+    /** Newest first. */
+    commits: CommitInfo[];
+    /**
+     * Head of the most recent commit review on this branch, when it is
+     * still in `commits`. Everything above it is "new since you last
+     * looked".
+     */
+    lastReviewedSha?: string;
+    /** True when the fetch from the remote failed and the list is local. */
+    offline?: boolean;
+}
+
+// ── Full diff (Code tab) ───────────────────────────────────
+
+export interface DiffFilePatch {
+    path: string;
+    oldPath?: string;
+    status: "added" | "modified" | "deleted" | "renamed";
+    added: number;
+    removed: number;
+    binary: boolean;
+    /**
+     * This file's unified diff, starting at its `diff --git` line, from
+     * `git diff mergeBase..head`. Empty for binary files.
+     */
+    patch: string;
+    /** The patch was cut off because the file's diff is very large. */
+    truncated: boolean;
+}
+
+export interface SessionDiff {
+    files: DiffFilePatch[];
+    /** Vendored, generated and lock files left out (SPEC §2.2). */
+    excludedFiles: number;
+}
+
+// ── Notes ──────────────────────────────────────────────────
+
+/** Where a note is pinned. No anchor = a note on the whole review. */
+export type NoteAnchor =
+    | { kind: "line"; file: string; line: number; side: "old" | "new" }
+    | { kind: "block"; entryPointId: string; blockId: string; label: string };
+
+/** A private note. Notes never leave the machine unless exported. */
+export interface Note {
+    id: string;
+    sessionId: string;
+    body: string;
+    anchor?: NoteAnchor;
+    /** The head the note was written against. */
+    headSha: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 // ── Analyses ───────────────────────────────────────────────
@@ -478,6 +576,14 @@ export interface GrspCommands {
 
     repo_inspect: { args: { path: string }; result: RepoInspection };
     repo_list_branches: { args: { repoId: string }; result: BranchList };
+    /**
+     * Recent commits on a branch, newest first. Fetches the branch from the
+     * remote first (best effort) so freshly pushed commits show up.
+     */
+    repo_list_commits: {
+        args: { repoId: string; branch: string; limit?: number };
+        result: CommitList;
+    };
     /** Clones owner/name from GitHub into grsp's own folder; returns its path. */
     repo_clone: {
         args: { owner: string; name: string };
@@ -526,6 +632,22 @@ export interface GrspCommands {
         };
         result: Excerpt;
     };
+
+    /** The whole diff of a session, file by file, for the Code tab. */
+    diff_read: { args: { sessionId: string }; result: SessionDiff };
+
+    note_list: { args: { sessionId: string }; result: Note[] };
+    /** Creates a note, or updates the body of an existing one when `id` is set. */
+    note_save: {
+        args: {
+            sessionId: string;
+            id?: string;
+            body: string;
+            anchor?: NoteAnchor;
+        };
+        result: Note;
+    };
+    note_delete: { args: { noteId: string }; result: null };
 
     review_update_finding: {
         args: {
