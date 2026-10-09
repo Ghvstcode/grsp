@@ -29,6 +29,41 @@ export async function pickFolder(title: string): Promise<string | undefined> {
     return selected;
 }
 
+/**
+ * Saves text to a file the user chooses. In the app this is the native save
+ * dialog; in a browser the file is downloaded. Resolves false when the user
+ * cancels.
+ */
+export async function saveTextFile(
+    defaultName: string,
+    contents: string,
+): Promise<boolean> {
+    if (!isTauri) {
+        const url = URL.createObjectURL(
+            new Blob([contents], { type: "text/markdown;charset=utf-8" }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = defaultName;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        return true;
+    }
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const extension = defaultName.split(".").pop() ?? "md";
+    const path = await save({
+        defaultPath: defaultName,
+        filters: [{ name: "Markdown", extensions: [extension] }],
+    });
+    if (!path) return false;
+    // The dialog adds the chosen path to the fs plugin's scope.
+    const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+    await writeTextFile(path, contents);
+    return true;
+}
+
 /** Subscribes to deep links (`grsp://…`). Returns an unsubscribe function. */
 export function onDeepLink(handler: (url: string) => void): () => void {
     if (!isTauri) return () => {};

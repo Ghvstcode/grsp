@@ -21,7 +21,8 @@ export function EmptyState() {
                     : "Point grsp at a pull request to see what it actually does."}
             </p>
             <p className="mt-1 text-xs text-muted-foreground/60 animate-fade-in-up delay-200">
-                Paste a PR link, pick an open PR, or compare two branches.
+                Paste a PR link, pick an open PR, compare two branches, or
+                review commits.
             </p>
             <div className="mt-6 animate-fade-in-up delay-300">
                 <Button

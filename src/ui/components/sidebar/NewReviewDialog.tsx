@@ -25,6 +25,7 @@ import {
     useOpenPrs,
     useRepos,
 } from "@core/api/useRepos";
+import { useCommits } from "@core/api/useCommits";
 import { useCreateSession, useSessions } from "@core/api/useSessions";
 import { useAppStore } from "@core/store/app-store";
 import type {
@@ -32,20 +33,23 @@ import type {
     Repo,
     RepoNotAddedError,
 } from "@core/types/grsp";
+import { commitsInput } from "@core/utils/commits";
 import {
     errorMessage,
     looksLikePrUrl,
     parseRepoNotAdded,
 } from "@core/utils/sessions";
 import { AddFolderDialog } from "./AddFolderDialog";
+import { CommitList } from "./CommitList";
 import { PrList } from "./PrList";
 
-type Mode = "url" | "pr" | "branches";
+type Mode = "url" | "pr" | "branches" | "commits";
 
 const MODES: { value: Mode; label: string }[] = [
     { value: "url", label: "Paste a URL" },
     { value: "pr", label: "Open pull requests" },
     { value: "branches", label: "Two branches" },
+    { value: "commits", label: "Commits" },
 ];
 
 interface NewReviewDialogProps {
@@ -65,6 +69,9 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
     const [repoId, setRepoId] = useState<string | undefined>(undefined);
     const [base, setBase] = useState<string | undefined>(undefined);
     const [head, setHead] = useState<string | undefined>(undefined);
+    const [commitBranch, setCommitBranch] = useState<string | undefined>(
+        undefined,
+    );
     const [error, setError] = useState<string | undefined>(undefined);
     const [repoNotAdded, setRepoNotAdded] = useState<
         RepoNotAddedError | undefined
@@ -83,6 +90,7 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
         setPendingInput(undefined);
         setBase(undefined);
         setHead(undefined);
+        setCommitBranch(undefined);
         const current = sessions?.find((s) => s.id === selectedSessionId);
         setRepoId(current?.repoId);
         // Only on open: later session/selection changes must not reset the form.
@@ -96,7 +104,10 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
         repo?.id,
         open && mode === "pr" && !!repo?.remote,
     );
-    const branches = useBranches(repo?.id, open && mode === "branches");
+    const branches = useBranches(
+        repo?.id,
+        open && (mode === "branches" || mode === "commits"),
+    );
 
     const effectiveBase =
         base ??
@@ -106,6 +117,14 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
                   ...branches.data.remote,
               ])
             : undefined);
+
+    // Commits default to the repo's default branch, where merged work lands.
+    const effectiveCommitBranch = commitBranch ?? effectiveBase;
+    const commits = useCommits(
+        repo?.id,
+        effectiveCommitBranch,
+        open && mode === "commits",
+    );
 
     function start(input: NewSessionInput) {
         setError(undefined);
@@ -146,6 +165,7 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
         setRepoId(id);
         setBase(undefined);
         setHead(undefined);
+        setCommitBranch(undefined);
         setError(undefined);
     }
 
@@ -195,8 +215,8 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
                     <DialogHeader>
                         <DialogTitle>New review</DialogTitle>
                         <DialogDescription>
-                            Point grsp at a pull request, or compare two
-                            branches.
+                            Point grsp at a pull request, compare two branches,
+                            or review commits without a pull request.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -271,7 +291,8 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
                                                 This folder has no GitHub
                                                 remote, so there are no pull
                                                 requests to list. You can still
-                                                compare two branches.
+                                                compare two branches or review
+                                                commits.
                                             </p>
                                         </div>
                                     ) : (
@@ -397,6 +418,87 @@ export function NewReviewDialog({ open, onOpenChange }: NewReviewDialogProps) {
                                                 branch.
                                             </p>
                                         )}
+                                </>
+                            ))}
+
+                        {mode === "commits" &&
+                            (!hasRepos ? (
+                                noRepos
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {repoPicker}
+                                        <BranchSelect
+                                            label="Branch"
+                                            placeholder={
+                                                branches.isLoading
+                                                    ? "Reading branches…"
+                                                    : "Branch to read commits from"
+                                            }
+                                            value={effectiveCommitBranch}
+                                            onValueChange={(value) => {
+                                                setCommitBranch(value);
+                                                setError(undefined);
+                                            }}
+                                            local={branches.data?.local}
+                                            remote={branches.data?.remote}
+                                            disabled={
+                                                branches.isLoading ||
+                                                !!branches.error
+                                            }
+                                        />
+                                    </div>
+                                    {branches.error ? (
+                                        <div className="rounded-lg border border-line px-4 py-3">
+                                            <p className="text-[13px] font-medium">
+                                                Couldn't list branches
+                                            </p>
+                                            <p className="mt-0.5 select-text text-xs text-text-2">
+                                                {errorMessage(branches.error)}
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    void branches.refetch()
+                                                }
+                                                className="mt-2 text-xs font-medium underline underline-offset-[3px]"
+                                            >
+                                                Retry
+                                            </button>
+                                        </div>
+                                    ) : !effectiveCommitBranch &&
+                                      !branches.isLoading ? (
+                                        <div className="rounded-lg border border-line px-4 py-3">
+                                            <p className="text-[13px] text-text-2">
+                                                Choose a branch to see its
+                                                commits.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <CommitList
+                                            list={commits.data}
+                                            isLoading={
+                                                branches.isLoading ||
+                                                commits.isLoading
+                                            }
+                                            error={commits.error}
+                                            onRetry={() =>
+                                                void commits.refetch()
+                                            }
+                                            pending={isPending}
+                                            onPick={(pick) => {
+                                                if (!repo || !commits.data) {
+                                                    return;
+                                                }
+                                                const input = commitsInput(
+                                                    repo.id,
+                                                    commits.data,
+                                                    pick,
+                                                );
+                                                if (input) start(input);
+                                            }}
+                                        />
+                                    )}
                                 </>
                             ))}
 

@@ -8,7 +8,7 @@ import { useFixtures } from "@core/services/client";
  *
  * Events say what the app was used for (a review was opened, a pipeline
  * finished, a review was posted), never what was reviewed: no code, paths,
- * repository names, PR titles, questions or comments. Each batch carries a
+ * repository names, PR titles, questions, comments or notes. Each batch carries a
  * random install id, plus the grsp account when the user is signed in.
  * Turned off in Settings → General.
  */
@@ -19,9 +19,11 @@ export interface MetricEvents {
     session_end: { durationSeconds: number };
     onboarding_completed: undefined;
     repo_added: { via: "folder" | "clone" };
-    review_session_created: { source: "url" | "pr" | "branches" };
+    review_session_created: { source: "url" | "pr" | "branches" | "commits" };
     analysis_completed: { kind: string; status: "done" | "error" };
     ask_sent: undefined;
+    /** A private note was created or edited. Never its text or anchor. */
+    note_saved: undefined;
     review_posted: { event: string };
     settings_changed: { setting: string };
 }

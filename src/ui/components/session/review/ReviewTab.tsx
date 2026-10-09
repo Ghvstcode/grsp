@@ -32,6 +32,7 @@ import {
     prOf,
     refLabel,
     repoSlugOf,
+    sourceWording,
     sectionState,
 } from "../lib/status";
 import { plural } from "../lib/text";
@@ -58,15 +59,12 @@ function IdleCard({
     onRun: () => void;
 }) {
     const navigate = useNavigate();
-    const isPr = session.source.kind === "pr";
     return (
         <div className="flex flex-col gap-[18px] rounded-xl border p-7">
             <div className="flex flex-col gap-1.5">
                 <h2 className="m-0 text-lg font-semibold">Run an AI review</h2>
                 <p className="grsp-text-2 m-0">
-                    {isPr
-                        ? "Reads the change, the paths it touches and the existing discussion, then drafts inline comments. Nothing is posted until you choose a verdict."
-                        : "Reads the change and the paths it touches, then drafts comments. A branch comparison has no pull request, so nothing can be posted."}
+                    {sourceWording(session).reviewIntro}
                 </p>
             </div>
             <div className="grsp-bg-wash flex flex-col gap-1.5 rounded-lg px-4 py-3.5">
@@ -469,9 +467,7 @@ export function ReviewTab({ session, settings }: ReviewTabProps) {
                 ))}
                 {!isPr ? (
                     <div className="grsp-border-strong rounded-xl border border-dashed px-6 py-[18px] text-[13px] text-muted-foreground">
-                        Posting isn't available for a branch comparison. Open a
-                        pull request for these branches to post this review to
-                        GitHub.
+                        {sourceWording(session).noPosting}
                     </div>
                 ) : posted ? (
                     <PostedBar session={session} inlineCount={counts.inline} />

@@ -36,6 +36,18 @@ pub struct Outcome<T> {
     pub report: VerificationReport,
 }
 
+/// Said once in the context of a commit session. The pipeline instructions
+/// are written for pull requests; this maps their words onto commits and
+/// sets what the change is measured against.
+const COMMITS_NOTE_SINGLE: &str = "This change is one commit, not a pull request. Wherever the task says \"pull request\", read \"this commit\"; wherever it says \"the description\", read the commit message below.\nThe commit may be one step in a longer series. The reference is the surrounding code as it stands at this commit, which is what your working directory contains. Commits made after it are not visible to you: don't assume they exist, and don't guess what they contain.\n";
+
+const COMMITS_NOTE_RUN: &str = "This change is a run of commits, not a pull request. Wherever the task says \"pull request\", read \"these commits, taken together\"; wherever it says \"the description\", read the commit messages below.\nThe run may be one stretch of a longer series. The reference is the surrounding code as it stands at the last of these commits, which is what your working directory contains. Commits made after it are not visible to you: don't assume they exist, and don't guess what they contain.\n";
+
+/// What counts as a checkable claim in a commit message (discovery step 4).
+const COMMIT_CLAIMS_SINGLE: &str = "A commit message is often only a label. Only a statement about what the software does is a checkable claim; a line that merely names the change is not one.\n\n";
+
+const COMMIT_CLAIMS_RUN: &str = "Each item is one commit's subject line, with the rest of its message indented beneath when it has one. A subject line usually only names its commit: treat it as a checkable claim only when it plainly states what the software does. Something an earlier commit says and a later commit in this run deliberately changes is not a mismatch.\n\n";
+
 fn short(sha: &str) -> &str {
     &sha[..sha.len().min(10)]
 }
@@ -131,22 +143,85 @@ impl PassCtx {
                     out.push_str(&format!("Title: {}\n", s.title.trim()));
                 }
             }
+            SessionSource::Commits { branch, count, .. } => {
+                let on = branch
+                    .as_deref()
+                    .map(|b| format!(" on branch `{b}`"))
+                    .unwrap_or_default();
+                if *count > 1 {
+                    out.push_str(&format!(
+                        "A run of {count} consecutive commits{on}, reviewed together as one change. There is no pull request.\n"
+                    ));
+                } else {
+                    out.push_str(&format!("A single commit{on}. There is no pull request.\n"));
+                    if !s.title.trim().is_empty() {
+                        out.push_str(&format!("Subject: {}\n", s.title.trim()));
+                    }
+                }
+            }
         }
         if !s.author.trim().is_empty() {
             out.push_str(&format!("Author: {}\n", s.author.trim()));
         }
-        out.push_str(&format!(
-            "Base: {} (merge base {})\nHead: {} ({}) — this is what your working directory contains\n",
-            s.base_ref,
-            short(&self.merge_base_sha),
-            s.head_ref,
-            short(&self.head_sha),
-        ));
-        out.push_str("\n## Description\n\n");
+        match &s.source {
+            SessionSource::Commits { count, .. } => {
+                let many = *count > 1;
+                if git::is_empty_tree(&self.merge_base_sha) {
+                    out.push_str(
+                        "Base: none. The change starts at the repository's first commit, so every file in it is new.\n",
+                    );
+                } else {
+                    out.push_str(&format!(
+                        "Base: {} ({})\n",
+                        short(&self.merge_base_sha),
+                        if many {
+                            "the commit just before the oldest one reviewed"
+                        } else {
+                            "the commit's parent"
+                        }
+                    ));
+                }
+                out.push_str(&format!(
+                    "Head: {} — this is what your working directory contains\n\n",
+                    short(&self.head_sha)
+                ));
+                out.push_str(if many {
+                    COMMITS_NOTE_RUN
+                } else {
+                    COMMITS_NOTE_SINGLE
+                });
+                out.push_str(if many {
+                    "\n## Description (the commit messages, oldest first)\n\n"
+                } else {
+                    "\n## Description (the commit message)\n\n"
+                });
+            }
+            _ => {
+                out.push_str(&format!(
+                    "Base: {} (merge base {})\nHead: {} ({}) — this is what your working directory contains\n",
+                    s.base_ref,
+                    short(&self.merge_base_sha),
+                    s.head_ref,
+                    short(&self.head_sha),
+                ));
+                out.push_str("\n## Description\n\n");
+            }
+        }
         let desc = s.description.trim();
         if desc.is_empty() {
-            out.push_str("(The author wrote no description. There is nothing to compare the code against.)\n");
-        } else if desc.chars().count() > DESCRIPTION_MAX_CHARS {
+            out.push_str(if s.source.is_commits() {
+                "(The commit message is only its subject line, shown above. A subject line names the change; it is not a description to check the code against. There is nothing to compare the code against, so report no mismatches.)\n"
+            } else {
+                "(The author wrote no description. There is nothing to compare the code against.)\n"
+            });
+            return out;
+        }
+        match &s.source {
+            SessionSource::Commits { count, .. } if *count > 1 => out.push_str(COMMIT_CLAIMS_RUN),
+            SessionSource::Commits { .. } => out.push_str(COMMIT_CLAIMS_SINGLE),
+            _ => {}
+        }
+        if desc.chars().count() > DESCRIPTION_MAX_CHARS {
             let head: String = desc.chars().take(DESCRIPTION_MAX_CHARS).collect();
             out.push_str(&head);
             out.push_str("\n… (description truncated)\n");
@@ -381,6 +456,113 @@ mod tests {
             "+line 2",
         ] {
             assert!(pack.contains(needle), "missing {needle:?} in:\n{pack}");
+        }
+    }
+
+    fn commit_ctx(count: u32, branch: Option<&str>, title: &str, description: &str) -> PassCtx {
+        let mut c = ctx(description, 1, 1);
+        c.session.title = title.into();
+        c.session.source = SessionSource::Commits {
+            branch: branch.map(String::from),
+            base: "b".repeat(40),
+            head: "a".repeat(40),
+            count,
+        };
+        c
+    }
+
+    #[test]
+    fn a_single_commit_is_described_as_a_commit_not_a_pull_request() {
+        let c = commit_ctx(
+            1,
+            Some("main"),
+            "Hold large orders",
+            "Orders over the limit now wait for approval.",
+        );
+        let header = c.header();
+        for needle in [
+            "A single commit on branch `main`. There is no pull request.",
+            "Subject: Hold large orders",
+            "Author: maya",
+            "Base: bbbbbbbbbb (the commit's parent)",
+            "Head: aaaaaaaaaa — this is what your working directory contains",
+            "This change is one commit, not a pull request.",
+            "read the commit message below",
+            "may be one step in a longer series",
+            "as it stands at this commit",
+            "## Description (the commit message)",
+            "Only a statement about what the software does is a checkable claim",
+            "Orders over the limit now wait for approval.",
+        ] {
+            assert!(header.contains(needle), "missing {needle:?} in:\n{header}");
+        }
+        assert!(!header.contains("Pull request #"));
+        assert!(!header.contains("merge base"));
+    }
+
+    #[test]
+    fn a_commit_with_only_a_subject_has_nothing_to_compare_against() {
+        let header = commit_ctx(1, None, "wip", "  ").header();
+        assert!(header.contains("A single commit. There is no pull request."));
+        assert!(header.contains("The commit message is only its subject line"));
+        assert!(header.contains("report no mismatches"));
+        assert!(!header.contains("checkable claim"));
+        assert!(!header.contains("The author wrote no description"));
+    }
+
+    #[test]
+    fn a_run_of_commits_is_described_as_a_run() {
+        let c = commit_ctx(
+            3,
+            Some("feature/x"),
+            "3 commits on feature/x",
+            "- Add the limit\n- Hold large orders\n\n  Over the limit they wait.\n- Tidy",
+        );
+        let header = c.header();
+        for needle in [
+            "A run of 3 consecutive commits on branch `feature/x`, reviewed together as one change.",
+            "Base: bbbbbbbbbb (the commit just before the oldest one reviewed)",
+            "This change is a run of commits, not a pull request.",
+            "may be one stretch of a longer series",
+            "## Description (the commit messages, oldest first)",
+            "treat it as a checkable claim only when it plainly states what the software does",
+            "- Hold large orders",
+        ] {
+            assert!(header.contains(needle), "missing {needle:?} in:\n{header}");
+        }
+        assert!(!header.contains("Subject:"));
+    }
+
+    #[test]
+    fn a_root_commit_has_no_base() {
+        let mut c = commit_ctx(1, None, "Initial commit", "");
+        c.merge_base_sha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904".into();
+        let header = c.header();
+        assert!(header.contains("Base: none. The change starts at the repository's first commit"));
+        assert!(!header.contains("4b825dc"));
+    }
+
+    #[test]
+    fn commit_wording_is_language_agnostic() {
+        let all = [
+            COMMITS_NOTE_SINGLE,
+            COMMITS_NOTE_RUN,
+            COMMIT_CLAIMS_SINGLE,
+            COMMIT_CLAIMS_RUN,
+        ]
+        .join("\n")
+        .to_lowercase();
+        for banned in [
+            "python",
+            "javascript",
+            "typescript",
+            "rust",
+            ".py",
+            ".ts",
+            "django",
+            "react",
+        ] {
+            assert!(!all.contains(banned), "commit wording mentions `{banned}`");
         }
     }
 

@@ -1,7 +1,7 @@
 {
     "name": "grsp",
     "private": true,
-    "version": "0.1.2",
+    "version": "0.2.0",
     "type": "module",
     "scripts": {
         "vite:dev": "vite",
@@ -30,6 +30,7 @@
     "dependencies": {
         "@fontsource-variable/geist": "^5.2.5",
         "@fontsource-variable/geist-mono": "^5.2.5",
+        "@pierre/diffs": "^1.1.0",
         "@radix-ui/react-collapsible": "^1.1.12",
         "@radix-ui/react-dialog": "^1.1.11",
         "@radix-ui/react-dropdown-menu": "^2.1.12",
@@ -51,6 +52,7 @@
         "@tauri-apps/api": "^2.5.0",
         "@tauri-apps/plugin-deep-link": "~2.4.7",
         "@tauri-apps/plugin-dialog": "~2",
+        "@tauri-apps/plugin-fs": "~2",
         "@tauri-apps/plugin-opener": "~2",
         "@tauri-apps/plugin-os": "~2",
         "@tauri-apps/plugin-process": "~2",

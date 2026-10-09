@@ -308,3 +308,12 @@ Session screens (PR header, Gist + Ask, Walkthrough, Review), fixtures and hooks
 - Scorer tests live in `evals/tests/*.mjs` (no `.test.` in the name) so Vitest doesn't pick them up; fixture files avoid `.test.`/`.spec.` names for the same reason. Run with `pnpm eval:test`.
 - Fixture repos are left checked out on `main` so `pr` is free for a worktree.
 - `.prettierignore` also lists `design/DESIGN.md`, `design/PROMPT.md` and `design/SPEC.md`: they fail `prettier --check` as handed over, and reformatting the source-of-truth documents isn't this agent's call.
+
+## Commit reviews (0.2.0)
+
+- A review is always "base commit → head commit", so commits are a new source kind beside PRs and branch pairs, not a new pipeline. The commit message (or the list of messages for a range) stands in for the PR description.
+- Commit sessions never call GitHub, have no discussion and cannot post a review. Notes are local only; GitHub's commit comments were left out because they don't notify and are hard to find again.
+- A root commit is diffed against git's empty tree and a merge commit against its first parent.
+- "Since you last looked" is the head of the most recent commit review on the same branch name.
+- The Code tab renders with `@pierre/diffs` as plain text in a black-and-white theme, with no syntax colour.
+- Migration 2 adds `notes` and `session_commits`. Because the Rust core may apply migrations before the SQL plugin does, every migration from here on must be idempotent.

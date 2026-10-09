@@ -14,16 +14,26 @@ import {
     type AnalysisKind,
     type AskEvent,
     type AskMessage,
+    type CommitInfo,
     type DiscoveryResult,
     type GrspCommands,
     type NewSessionInput,
+    type Note,
     type QuestionsResult,
     type RepoNotAddedError,
     type ReviewResult,
     type ReviewSession,
+    type SessionDiff,
     type SessionEvent,
     type VerificationReport,
 } from "@core/types/grsp";
+import {
+    fakeSha,
+    fixtureCommits,
+    localBranchName,
+    SEEDED_LAST_REVIEWED_INDEX,
+} from "./commits";
+import { emptyFixtureDiff, fixtureDiff, tinyFixtureDiff } from "./diff";
 import { readRange } from "./excerpts";
 import {
     answerFor,
@@ -111,6 +121,11 @@ export function createFixtureBackend(
     const asks = new Map<string, AskMessage[]>();
     /** Sessions that carry the full prototype scenario. */
     const scenarioSessions = new Set<string>();
+    /** Commit sessions whose diff is a one-line fix. */
+    const tinySessions = new Set<string>();
+    const notes = new Map<string, Note[]>();
+    /** `repoId:branch` → head of the latest commit review on that branch. */
+    const lastReviewed = new Map<string, string>();
     const timers = new Map<string, ReturnType<typeof setTimeout>[]>();
     const listeners = new Map<string, Set<(payload: unknown) => void>>();
     let counter = 0;
@@ -203,7 +218,12 @@ export function createFixtureBackend(
         }
         if (kind === "discussion") {
             if (session.source.kind !== "pr") {
-                return { error: "Branch comparisons have no discussion." };
+                return {
+                    error:
+                        session.source.kind === "commits"
+                            ? "Commits have no discussion."
+                            : "Branch comparisons have no discussion.",
+                };
             }
             const result =
                 full && !variants.has("nodiscussion")
@@ -344,10 +364,13 @@ export function createFixtureBackend(
     }
 
     function preparingSteps(session: ReviewSession): string[] {
+        const source = session.source;
         const fetching =
-            session.source.kind === "pr"
-                ? `Fetching pull/${session.source.number}/head`
-                : `Fetching ${session.source.base} and ${session.source.head}`;
+            source.kind === "pr"
+                ? `Fetching pull/${source.number}/head`
+                : source.kind === "commits"
+                  ? `Fetching ${source.branch ?? source.head.slice(0, 7)}`
+                  : `Fetching ${source.base} and ${source.head}`;
         return [
             fetching,
             `Creating a read-only worktree at ${(session.headSha ?? HEAD_SHA).slice(0, 7)}`,
@@ -376,6 +399,30 @@ export function createFixtureBackend(
             primary.author = "";
             primary.ci = undefined;
         }
+        if (variants.has("commit") || variants.has("commits")) {
+            const branch = "feat/order-approval";
+            const history = fixtureCommits("orders", branch);
+            const count = variants.has("commits") ? 4 : 1;
+            const picked = history.slice(0, count);
+            primary.source = {
+                kind: "commits",
+                branch,
+                base: history[count].sha,
+                head: picked[0].sha,
+                count,
+            };
+            primary.title = commitsTitle(picked, branch);
+            primary.description = commitsDescription(picked);
+            primary.author = commitsAuthor(picked);
+            primary.baseRef = branch;
+            primary.ci = undefined;
+        }
+        if (variants.has("tiny")) {
+            tinySessions.add(primary.id);
+            primary.filesChanged = 1;
+            primary.linesAdded = 1;
+            primary.linesRemoved = 1;
+        }
         if (variants.has("nodesc")) primary.description = "";
         if (variants.has("ownpr")) {
             primary.isOwnPr = true;
@@ -389,6 +436,14 @@ export function createFixtureBackend(
             primary.newCommits = 3;
         }
         if (variants.has("preparing")) primary.status = "preparing";
+
+        lastReviewed.set(
+            "orders:feat/order-approval",
+            fixtureCommits("orders", "feat/order-approval")[
+                SEEDED_LAST_REVIEWED_INDEX
+            ].sha,
+        );
+        notes.set(PRIMARY_SESSION_ID, seedNotes());
 
         const fresh = variants.has("fresh") || variants.has("preparing");
         for (const session of sessions.values()) {
@@ -444,7 +499,109 @@ export function createFixtureBackend(
 
     // ── Sessions ───────────────────────────────────────────
 
+    function commitsTitle(picked: CommitInfo[], branch: string): string {
+        return picked.length === 1
+            ? picked[0].subject
+            : `Commits on ${localBranchName(branch)}`;
+    }
+
+    /** One commit: its body. A run: every message, oldest first. */
+    function commitsDescription(picked: CommitInfo[]): string {
+        if (picked.length === 1) return picked[0].body;
+        return [...picked]
+            .reverse()
+            .map((c) =>
+                [`**${c.subject}** (\`${c.shortSha}\`)`, c.body]
+                    .filter(Boolean)
+                    .join("\n\n"),
+            )
+            .join("\n\n");
+    }
+
+    function commitsAuthor(picked: CommitInfo[]): string {
+        const authors = [...new Set(picked.map((c) => c.author))];
+        return authors.length > 2
+            ? `${authors[0]} and ${authors.length - 1} others`
+            : authors.join(" and ");
+    }
+
+    function createCommitSession(
+        input: Extract<NewSessionInput, { kind: "commits" }>,
+    ): ReviewSession {
+        const branch = input.branch ?? "main";
+        const history = fixtureCommits(input.repoId, branch);
+        const headIndex = history.findIndex((c) => c.sha === input.head);
+        if (headIndex < 0) reject("That commit isn't on this branch.");
+        const fromIndex = input.from
+            ? history.findIndex((c) => c.sha === input.from)
+            : headIndex;
+        if (fromIndex < headIndex) {
+            reject("The first commit of the range isn't behind its head.");
+        }
+        const picked = history.slice(headIndex, fromIndex + 1);
+        const base =
+            history.at(fromIndex + 1)?.sha ??
+            fakeSha(`parent:${history[fromIndex].sha}`);
+        lastReviewed.set(
+            `${input.repoId}:${localBranchName(branch)}`,
+            input.head,
+        );
+
+        const existing = [...sessions.values()].find(
+            (s) =>
+                s.repoId === input.repoId &&
+                s.status !== "closed" &&
+                s.source.kind === "commits" &&
+                s.source.base === base &&
+                s.source.head === input.head,
+        );
+        if (existing) return existing;
+
+        counter += 1;
+        const now = new Date().toISOString();
+        const linesAdded = picked.reduce((n, c) => n + c.added, 0);
+        const linesRemoved = picked.reduce((n, c) => n + c.removed, 0);
+        const session: ReviewSession = {
+            id: `c${counter}`,
+            repoId: input.repoId,
+            source: {
+                kind: "commits",
+                branch: input.branch,
+                base,
+                head: input.head,
+                count: picked.length,
+            },
+            title: commitsTitle(picked, branch),
+            description: commitsDescription(picked),
+            author: commitsAuthor(picked),
+            baseRef: branch,
+            headRef: branch,
+            baseSha: base,
+            headSha: input.head,
+            mergeBaseSha: base,
+            status: "preparing",
+            prState: "open",
+            isOwnPr: false,
+            filesChanged: Math.max(...picked.map((c) => c.filesChanged)),
+            linesAdded,
+            linesRemoved,
+            newCommits: 0,
+            agentPasses: 0,
+            createdAt: now,
+            lastOpenedAt: now,
+        };
+        sessions.set(session.id, session);
+        asks.set(session.id, []);
+        scenarioSessions.add(session.id);
+        if (linesAdded + linesRemoved <= 10) tinySessions.add(session.id);
+        prepare(session, preparingSteps(session), () =>
+            runPipeline(session.id),
+        );
+        return session;
+    }
+
     function createSession(input: NewSessionInput): ReviewSession {
+        if (input.kind === "commits") return createCommitSession(input);
         counter += 1;
         let repoId: string;
         let source: ReviewSession["source"];
@@ -584,6 +741,51 @@ export function createFixtureBackend(
         return session;
     }
 
+    // ── Diff and notes ─────────────────────────────────────
+
+    function diffOf(sessionId: string): SessionDiff {
+        getSession(sessionId);
+        if (!scenarioSessions.has(sessionId)) return emptyFixtureDiff();
+        return tinySessions.has(sessionId) ? tinyFixtureDiff() : fixtureDiff();
+    }
+
+    function seedNotes(): Note[] {
+        const base = {
+            sessionId: PRIMARY_SESSION_ID,
+            headSha: HEAD_SHA,
+        };
+        return [
+            {
+                ...base,
+                id: "n1",
+                body: "Check with Kemi whether the nightly import is **meant** to skip approval. If it is, the description should say so.",
+                createdAt: ago(0.4),
+                updatedAt: ago(0.4),
+            },
+            {
+                ...base,
+                id: "n2",
+                body: "`>` not `>=`: an order of exactly €10,000 goes straight through. Matches the tests, worth confirming with finance.",
+                anchor: {
+                    kind: "line",
+                    file: "orders/policies.py",
+                    line: 6,
+                    side: "new",
+                },
+                createdAt: ago(0.3),
+                updatedAt: ago(0.3),
+            },
+        ];
+    }
+
+    function findNote(noteId: string): Note | undefined {
+        for (const list of notes.values()) {
+            const found = list.find((n) => n.id === noteId);
+            if (found) return found;
+        }
+        return undefined;
+    }
+
     // ── Ask ────────────────────────────────────────────────
 
     function sendAsk(sessionId: string, question: string): AskMessage {
@@ -718,6 +920,23 @@ export function createFixtureBackend(
             };
         },
         repo_list_branches: () => BRANCHES,
+        repo_list_commits: ({ repoId, branch, limit }) => {
+            const name = localBranchName(branch);
+            if (name === "broken") reject("fatal: bad revision 'broken'");
+            const commits = fixtureCommits(repoId, branch).slice(
+                0,
+                limit ?? 50,
+            );
+            const reviewed = lastReviewed.get(`${repoId}:${name}`);
+            return {
+                branch,
+                commits,
+                lastReviewedSha: commits.some((c) => c.sha === reviewed)
+                    ? reviewed
+                    : undefined,
+                offline: variants.has("offline") ? true : undefined,
+            };
+        },
         repo_clone: ({ owner, name }) => ({
             path: `/Users/you/Library/Application Support/grsp/repos/${owner}/${name}`,
         }),
@@ -795,6 +1014,45 @@ export function createFixtureBackend(
         excerpt_read: ({ file, startLine, endLine }) =>
             readRange(file, startLine, endLine),
 
+        diff_read: ({ sessionId }) => diffOf(sessionId),
+
+        note_list: ({ sessionId }) => notes.get(sessionId) ?? [],
+        note_save: ({ sessionId, id, body, anchor }) => {
+            const session = getSession(sessionId);
+            const now = new Date().toISOString();
+            if (id !== undefined) {
+                const existing =
+                    notes.get(sessionId)?.find((n) => n.id === id) ??
+                    reject("Note not found.");
+                existing.body = body;
+                existing.updatedAt = now;
+                return existing;
+            }
+            counter += 1;
+            const note: Note = {
+                id: `n${counter}-${Date.now().toString(36)}`,
+                sessionId,
+                body,
+                anchor,
+                headSha: session.headSha ?? HEAD_SHA,
+                createdAt: now,
+                updatedAt: now,
+            };
+            notes.set(sessionId, [...(notes.get(sessionId) ?? []), note]);
+            return note;
+        },
+        note_delete: ({ noteId }) => {
+            const note = findNote(noteId);
+            if (!note) reject("Note not found.");
+            notes.set(
+                note.sessionId,
+                (notes.get(note.sessionId) ?? []).filter(
+                    (n) => n.id !== noteId,
+                ),
+            );
+            return null;
+        },
+
         review_update_finding: ({
             sessionId,
             findingId,
@@ -812,7 +1070,11 @@ export function createFixtureBackend(
         review_post: ({ sessionId, input }) => {
             const session = getSession(sessionId);
             if (session.source.kind !== "pr") {
-                reject("Posting isn't available for branch comparisons.");
+                reject(
+                    session.source.kind === "commits"
+                        ? "Posting isn't available for commits."
+                        : "Posting isn't available for branch comparisons.",
+                );
             }
             if (session.isOwnPr && input.event !== "COMMENT") {
                 reject(

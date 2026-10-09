@@ -14,6 +14,9 @@ interface AppStore {
     /** The "New review" dialog (opened from the sidebar and empty states). */
     isNewReviewOpen: boolean;
     setNewReviewOpen: (open: boolean) => void;
+    /** How the Code tab lays a diff out; remembered between launches. */
+    diffStyle: "split" | "unified";
+    setDiffStyle: (style: "split" | "unified") => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -31,12 +34,15 @@ export const useAppStore = create<AppStore>()(
                 }),
             isNewReviewOpen: false,
             setNewReviewOpen: (open) => set({ isNewReviewOpen: open }),
+            diffStyle: "unified",
+            setDiffStyle: (style) => set({ diffStyle: style }),
         }),
         {
             name: "grsp-app-store",
             partialize: (state) => ({
                 selectedSessionId: state.selectedSessionId,
                 sidebarWidth: state.sidebarWidth,
+                diffStyle: state.diffStyle,
             }),
         },
     ),

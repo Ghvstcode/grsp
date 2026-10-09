@@ -42,34 +42,44 @@ pub fn db_path(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join("grsp.db")
 }
 
-/// Open grsp.db with a busy timeout. The schema is owned by
-/// tauri-plugin-sql's migrations; if the tables don't exist yet (the
-/// frontend hasn't loaded the DB) the first migration, which is all
-/// `CREATE … IF NOT EXISTS`, is applied here so commands can run. Later
-/// migrations are always left to the plugin.
+/// Tables the newest migration creates. When any is missing the migrations
+/// are applied from here.
+const SCHEMA_TABLES: [&str; 3] = ["review_sessions", "notes", "session_commits"];
+
+/// Open grsp.db with a busy timeout and make sure the schema is current.
+///
+/// The schema is also migrated by tauri-plugin-sql, but only once the
+/// webview loads the database; the engine can get here first (startup
+/// cleanup, the eval runner, tests) and an updated app can find a database
+/// that an older version created. Every migration is idempotent, so running
+/// them from both sides is safe.
 pub fn open(app_data_dir: &Path) -> DbResult<Connection> {
     std::fs::create_dir_all(app_data_dir)
         .map_err(|err| format!("Couldn't create {}: {err}", app_data_dir.display()))?;
     let conn = e(Connection::open(db_path(app_data_dir)))?;
     e(conn.busy_timeout(Duration::from_secs(5)))?;
-    let has_schema: bool = e(conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'review_sessions')",
-        [],
-        |r| r.get(0),
-    ))?;
-    if !has_schema {
-        if let Some(first) = crate::migrations::migrations()
-            .into_iter()
-            .find(|m| m.version == 1)
-        {
-            e(conn.execute_batch(first.sql))?;
-        }
-    }
+    ensure_schema(&conn)?;
     Ok(conn)
 }
 
+/// Apply the migrations if a table the current schema needs is missing.
+pub fn ensure_schema(conn: &Connection) -> DbResult<()> {
+    let placeholders = vec!["?"; SCHEMA_TABLES.len()].join(", ");
+    let present: i64 = e(conn.query_row(
+        &format!(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ({placeholders})"
+        ),
+        rusqlite::params_from_iter(SCHEMA_TABLES.iter()),
+        |r| r.get(0),
+    ))?;
+    if present as usize != SCHEMA_TABLES.len() {
+        apply_migrations(conn)?;
+    }
+    Ok(())
+}
+
 /// Apply every `migrations::migrations()` SQL script to a connection, in
-/// version order. For fresh (test) databases.
+/// version order.
 pub fn apply_migrations(conn: &Connection) -> DbResult<()> {
     let mut migrations = crate::migrations::migrations();
     migrations.sort_by_key(|m| m.version);
@@ -156,22 +166,38 @@ pub fn find_repo_by_remote(conn: &Connection, owner: &str, name: &str) -> DbResu
 const SESSION_COLS: &str = "s.id, s.repo_id, s.source_kind, s.pr_number, s.pr_url, s.title, s.description, \
      s.author, s.base_ref, s.head_ref, s.base_sha, s.head_sha, s.merge_base_sha, s.status, s.error, \
      s.pr_state, s.is_own_pr, s.ci_json, s.diff_stats_json, s.new_commits, s.worktree_path, \
-     s.agent_passes, s.posted_review_json, s.archived, s.created_at, s.last_opened_at";
+     s.agent_passes, s.posted_review_json, s.archived, s.created_at, s.last_opened_at, \
+     (SELECT c.branch FROM session_commits c WHERE c.session_id = s.id), \
+     (SELECT c.base_sha FROM session_commits c WHERE c.session_id = s.id), \
+     (SELECT c.head_sha FROM session_commits c WHERE c.session_id = s.id), \
+     (SELECT c.commit_count FROM session_commits c WHERE c.session_id = s.id)";
 
 fn session_from_row(row: &Row<'_>) -> rusqlite::Result<SessionRow> {
     let source_kind: String = row.get(2)?;
     let base_ref: String = row.get(8)?;
     let head_ref: String = row.get(9)?;
-    let source = if source_kind == "pr" {
-        SessionSource::Pr {
+    let source = match source_kind.as_str() {
+        "pr" => SessionSource::Pr {
             number: row.get::<_, Option<i64>>(3)?.unwrap_or(0).max(0) as u64,
             url: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
-        }
-    } else {
-        SessionSource::Branches {
+        },
+        // The pinned SHAs double as a fallback if the detail row is missing.
+        "commits" => SessionSource::Commits {
+            branch: row.get::<_, Option<String>>(26)?.filter(|b| !b.is_empty()),
+            base: row
+                .get::<_, Option<String>>(27)?
+                .or(row.get::<_, Option<String>>(10)?)
+                .unwrap_or_default(),
+            head: row
+                .get::<_, Option<String>>(28)?
+                .or(row.get::<_, Option<String>>(11)?)
+                .unwrap_or_default(),
+            count: count(row.get::<_, Option<i64>>(29)?.unwrap_or(1)),
+        },
+        _ => SessionSource::Branches {
             base: base_ref.clone(),
             head: head_ref.clone(),
-        }
+        },
     };
     let stats: DiffStats = from_json(row.get(18)?).unwrap_or_default();
     Ok(SessionRow {
@@ -210,7 +236,30 @@ fn source_columns(source: &SessionSource) -> (&'static str, Option<i64>, Option<
     match source {
         SessionSource::Pr { number, url } => ("pr", Some(*number as i64), Some(url.as_str())),
         SessionSource::Branches { .. } => ("branches", None, None),
+        SessionSource::Commits { .. } => ("commits", None, None),
     }
+}
+
+/// Keep `session_commits` in step with a commit session's source.
+fn write_commit_source(conn: &Connection, session: &ReviewSession) -> DbResult<()> {
+    let SessionSource::Commits {
+        branch,
+        base,
+        head,
+        count,
+    } = &session.source
+    else {
+        return Ok(());
+    };
+    e(conn.execute(
+        "INSERT INTO session_commits (session_id, branch, base_sha, head_sha, commit_count)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(session_id) DO UPDATE SET
+            branch = excluded.branch, base_sha = excluded.base_sha,
+            head_sha = excluded.head_sha, commit_count = excluded.commit_count",
+        params![session.id, branch, base, head, count],
+    ))?;
+    Ok(())
 }
 
 fn opt_json<T: serde::Serialize>(v: Option<&T>) -> DbResult<Option<String>> {
@@ -278,7 +327,7 @@ pub fn insert_session(
             opened,
         ],
     ))?;
-    Ok(())
+    write_commit_source(conn, session)
 }
 
 /// Write every mutable column of the session from the struct. Leaves
@@ -321,7 +370,7 @@ pub fn update_session(conn: &Connection, session: &ReviewSession) -> DbResult<()
     if changed == 0 {
         return Err(format!("Session {} not found.", session.id));
     }
-    Ok(())
+    write_commit_source(conn, session)
 }
 
 pub fn get_session(conn: &Connection, id: &str) -> DbResult<Option<SessionRow>> {
@@ -389,8 +438,43 @@ pub fn find_session_by_source(
                 session_from_row,
             )
             .optional(),
+        // The same commits are the same review whichever branch they were
+        // picked from.
+        SessionSource::Commits { base, head, .. } => conn
+            .query_row(
+                &format!(
+                    "SELECT {SESSION_COLS} FROM review_sessions s
+                     JOIN session_commits sc ON sc.session_id = s.id
+                     WHERE s.archived = 0 AND s.repo_id = ?1 AND s.source_kind = 'commits'
+                       AND sc.base_sha = ?2 AND sc.head_sha = ?3
+                     ORDER BY s.rowid DESC LIMIT 1"
+                ),
+                params![repo_id, base, head],
+                session_from_row,
+            )
+            .optional(),
     };
     Ok(e(row)?.map(|r| r.session))
+}
+
+/// Head SHA of the most recent non-archived commit review of `branch` in
+/// this repo.
+pub fn last_reviewed_commit(
+    conn: &Connection,
+    repo_id: &str,
+    branch: &str,
+) -> DbResult<Option<String>> {
+    e(conn
+        .query_row(
+            "SELECT sc.head_sha FROM review_sessions s
+             JOIN session_commits sc ON sc.session_id = s.id
+             WHERE s.archived = 0 AND s.repo_id = ?1 AND s.source_kind = 'commits'
+               AND sc.branch = ?2
+             ORDER BY datetime(s.created_at) DESC, s.rowid DESC LIMIT 1",
+            params![repo_id, branch],
+            |r| r.get(0),
+        )
+        .optional())
 }
 
 fn update_one(conn: &Connection, sql: &str, p: impl rusqlite::Params, id: &str) -> DbResult<()> {
@@ -871,6 +955,101 @@ pub fn mark_findings_posted(
     Ok(())
 }
 
+// ── notes (private, local only) ────────────────────────────
+
+const NOTE_COLS: &str = "id, session_id, body, anchor_json, head_sha, created_at, updated_at";
+
+fn note_from_row(row: &Row<'_>) -> rusqlite::Result<Note> {
+    Ok(Note {
+        id: row.get(0)?,
+        session_id: row.get(1)?,
+        body: row.get(2)?,
+        anchor: from_json(row.get(3)?),
+        head_sha: row.get(4)?,
+        created_at: row.get::<_, Option<String>>(5)?.unwrap_or_default(),
+        updated_at: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+    })
+}
+
+pub fn get_note(conn: &Connection, id: &str) -> DbResult<Option<Note>> {
+    e(conn
+        .query_row(
+            &format!("SELECT {NOTE_COLS} FROM notes WHERE id = ?1"),
+            params![id],
+            note_from_row,
+        )
+        .optional())
+}
+
+/// A session's notes, oldest first.
+pub fn list_notes(conn: &Connection, session_id: &str) -> DbResult<Vec<Note>> {
+    let mut stmt = e(conn.prepare(&format!(
+        "SELECT {NOTE_COLS} FROM notes WHERE session_id = ?1 ORDER BY created_at, rowid"
+    )))?;
+    let rows = e(stmt.query_map(params![session_id], note_from_row))?;
+    e(rows.collect())
+}
+
+/// Create a note, or change the body of note `id`. The body is trimmed and
+/// must not be empty. A new note is pinned to the session's current head;
+/// an edit keeps the note's anchor and head.
+pub fn save_note(
+    conn: &Connection,
+    session_id: &str,
+    id: Option<&str>,
+    body: &str,
+    anchor: Option<&NoteAnchor>,
+) -> DbResult<Note> {
+    let body = body.trim();
+    if body.is_empty() {
+        return Err("A note can't be empty.".to_string());
+    }
+    let now = now_iso();
+    let gone = || "That note no longer exists.".to_string();
+    if let Some(id) = id {
+        let changed = e(conn.execute(
+            "UPDATE notes SET body = ?3, updated_at = ?4 WHERE id = ?1 AND session_id = ?2",
+            params![id, session_id, body, now],
+        ))?;
+        if changed == 0 {
+            return Err(gone());
+        }
+        return get_note(conn, id)?.ok_or_else(gone);
+    }
+    let session = get_session(conn, session_id)?
+        .ok_or_else(|| "That session no longer exists.".to_string())?
+        .session;
+    let note = Note {
+        id: uuid::Uuid::new_v4().to_string(),
+        session_id: session_id.to_string(),
+        body: body.to_string(),
+        anchor: anchor.cloned(),
+        head_sha: session.head_sha.unwrap_or_default(),
+        created_at: now.clone(),
+        updated_at: now,
+    };
+    e(conn.execute(
+        "INSERT INTO notes (id, session_id, body, anchor_json, head_sha, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            note.id,
+            note.session_id,
+            note.body,
+            opt_json(note.anchor.as_ref())?,
+            note.head_sha,
+            note.created_at,
+            note.updated_at,
+        ],
+    ))?;
+    Ok(note)
+}
+
+/// Delete a note. Deleting one that is already gone is not an error.
+pub fn delete_note(conn: &Connection, id: &str) -> DbResult<()> {
+    e(conn.execute("DELETE FROM notes WHERE id = ?1", params![id]))?;
+    Ok(())
+}
+
 // ── settings ───────────────────────────────────────────────
 
 /// One JSON-decoded setting value, if present. A value that isn't valid
@@ -989,6 +1168,304 @@ mod tests {
             created_at: String::new(),
             last_opened_at: String::new(),
         }
+    }
+
+    fn commit_session(id: &str, branch: Option<&str>, base: &str, head: &str) -> ReviewSession {
+        let mut s = session(id, "r1", 0);
+        s.source = SessionSource::Commits {
+            branch: branch.map(String::from),
+            base: base.into(),
+            head: head.into(),
+            count: 2,
+        };
+        s.base_ref = base[..7].into();
+        s.head_ref = branch.unwrap_or(&head[..7]).into();
+        s.base_sha = Some(base.into());
+        s.head_sha = Some(head.into());
+        s.merge_base_sha = Some(base.into());
+        s
+    }
+
+    fn tables(conn: &Connection) -> Vec<String> {
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+            .unwrap();
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0)).unwrap();
+        rows.map(Result::unwrap).collect()
+    }
+
+    fn only_migration_one(conn: &Connection) {
+        let first = crate::migrations::migrations()
+            .into_iter()
+            .find(|m| m.version == 1)
+            .unwrap();
+        conn.execute_batch(first.sql).unwrap();
+    }
+
+    #[test]
+    fn migrations_are_versioned_in_order_and_idempotent() {
+        let versions: Vec<i64> = crate::migrations::migrations()
+            .iter()
+            .map(|m| m.version)
+            .collect();
+        assert_eq!(versions, vec![1, 2]);
+
+        let conn = open_in_memory().unwrap();
+        let fresh = tables(&conn);
+        for t in ["review_sessions", "notes", "session_commits"] {
+            assert!(fresh.contains(&t.to_string()), "{t} missing from {fresh:?}");
+        }
+        // tauri-plugin-sql runs them again after Rust has; that must be safe.
+        apply_migrations(&conn).unwrap();
+        assert_eq!(tables(&conn), fresh);
+    }
+
+    #[test]
+    fn a_database_with_only_the_first_migration_is_brought_up_to_date() {
+        let conn = Connection::open_in_memory().unwrap();
+        only_migration_one(&conn);
+        conn.execute(
+            "INSERT INTO repos (id, name, path) VALUES ('r1', 'shop', '/code/shop')",
+            [],
+        )
+        .unwrap();
+        // A session written by the older app version.
+        conn.execute(
+            "INSERT INTO review_sessions (id, repo_id, source_kind, pr_number, base_ref, head_ref)
+             VALUES ('old', 'r1', 'pr', 7, 'main', 'feature')",
+            [],
+        )
+        .unwrap();
+        assert!(!tables(&conn).contains(&"notes".to_string()));
+
+        ensure_schema(&conn).unwrap();
+        assert!(tables(&conn).contains(&"notes".to_string()));
+        assert!(tables(&conn).contains(&"session_commits".to_string()));
+        // Existing rows are untouched and readable through the new queries.
+        let old = get_session(&conn, "old").unwrap().unwrap().session;
+        assert_eq!(old.source.pr_number(), Some(7));
+        let note = save_note(&conn, "old", None, "first", None).unwrap();
+        assert_eq!(list_notes(&conn, "old").unwrap(), vec![note]);
+        // Checking again changes nothing.
+        ensure_schema(&conn).unwrap();
+        assert_eq!(list_notes(&conn, "old").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn opening_a_database_file_migrates_it_whatever_state_it_is_in() {
+        let dir = tempfile::tempdir().unwrap();
+        // Brand new.
+        let conn = open(dir.path()).unwrap();
+        assert!(tables(&conn).contains(&"notes".to_string()));
+        drop(conn);
+
+        // Created by a version that only had the first migration.
+        let old_dir = tempfile::tempdir().unwrap();
+        {
+            let conn = Connection::open(db_path(old_dir.path())).unwrap();
+            only_migration_one(&conn);
+            assert!(!tables(&conn).contains(&"notes".to_string()));
+        }
+        let conn = open(old_dir.path()).unwrap();
+        assert!(tables(&conn).contains(&"notes".to_string()));
+        assert!(list_notes(&conn, "nobody").unwrap().is_empty());
+        assert!(list_sessions(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn commit_sessions_round_trip_and_are_found_by_their_commits() {
+        let conn = db();
+        let (base, head) = ("b".repeat(40), "a".repeat(40));
+        let s = commit_session("c1", Some("main"), &base, &head);
+        insert_session(&conn, &s, None).unwrap();
+
+        let row = get_session(&conn, "c1").unwrap().unwrap();
+        assert_eq!(row.session.source, s.source);
+        assert_eq!(row.session.head_ref, "main");
+        assert_eq!(row.session.base_ref, "bbbbbbb");
+        assert_eq!(row.session.head_sha.as_deref(), Some(head.as_str()));
+        assert_eq!(list_sessions(&conn).unwrap()[0].source, s.source);
+
+        // Found by base and head, whichever branch it is asked for under.
+        let probe = |branch: Option<&str>, base: &str, head: &str| SessionSource::Commits {
+            branch: branch.map(String::from),
+            base: base.into(),
+            head: head.into(),
+            count: 9,
+        };
+        let found = |src: &SessionSource| {
+            find_session_by_source(&conn, "r1", src)
+                .unwrap()
+                .map(|s| s.id)
+        };
+        assert_eq!(found(&probe(Some("main"), &base, &head)), Some("c1".into()));
+        assert_eq!(found(&probe(None, &base, &head)), Some("c1".into()));
+        // A different run ending at the same commit is a different review.
+        assert_eq!(found(&probe(Some("main"), &"c".repeat(40), &head)), None);
+        assert_eq!(found(&probe(Some("main"), &base, &"d".repeat(40))), None);
+        assert_eq!(
+            find_session_by_source(&conn, "r2", &probe(Some("main"), &base, &head)).unwrap(),
+            None
+        );
+        // A PR or branch lookup never returns a commit session.
+        assert_eq!(
+            find_session_by_source(
+                &conn,
+                "r1",
+                &SessionSource::Branches {
+                    base: "bbbbbbb".into(),
+                    head: "main".into()
+                }
+            )
+            .unwrap(),
+            None
+        );
+
+        // update_session keeps the detail row in step.
+        let mut changed = row.session.clone();
+        changed.source = SessionSource::Commits {
+            branch: None,
+            base: base.clone(),
+            head: head.clone(),
+            count: 5,
+        };
+        update_session(&conn, &changed).unwrap();
+        assert_eq!(
+            get_session(&conn, "c1").unwrap().unwrap().session.source,
+            changed.source
+        );
+
+        archive_session(&conn, "c1").unwrap();
+        assert_eq!(found(&probe(Some("main"), &base, &head)), None);
+    }
+
+    #[test]
+    fn last_reviewed_commit_is_the_newest_unarchived_review_of_that_branch() {
+        let conn = db();
+        let base = "b".repeat(40);
+        assert_eq!(last_reviewed_commit(&conn, "r1", "main").unwrap(), None);
+
+        let mut first = commit_session("c1", Some("main"), &base, &"1".repeat(40));
+        first.created_at = "2026-10-01T10:00:00.000Z".into();
+        let mut second = commit_session("c2", Some("main"), &base, &"2".repeat(40));
+        second.created_at = "2026-10-02T10:00:00.000Z".into();
+        let mut other_branch = commit_session("c3", Some("release"), &base, &"3".repeat(40));
+        other_branch.created_at = "2026-10-03T10:00:00.000Z".into();
+        let mut no_branch = commit_session("c4", None, &base, &"4".repeat(40));
+        no_branch.created_at = "2026-10-04T10:00:00.000Z".into();
+        let mut other_repo = commit_session("c5", Some("main"), &base, &"5".repeat(40));
+        other_repo.repo_id = "r2".into();
+        other_repo.created_at = "2026-10-05T10:00:00.000Z".into();
+        // Inserted out of order: the creation time decides, not the row order.
+        for s in [&second, &first, &other_branch, &no_branch, &other_repo] {
+            insert_session(&conn, s, None).unwrap();
+        }
+
+        assert_eq!(
+            last_reviewed_commit(&conn, "r1", "main").unwrap(),
+            Some("2".repeat(40))
+        );
+        assert_eq!(
+            last_reviewed_commit(&conn, "r1", "release").unwrap(),
+            Some("3".repeat(40))
+        );
+        assert_eq!(last_reviewed_commit(&conn, "r1", "nope").unwrap(), None);
+
+        archive_session(&conn, "c2").unwrap();
+        assert_eq!(
+            last_reviewed_commit(&conn, "r1", "main").unwrap(),
+            Some("1".repeat(40))
+        );
+    }
+
+    #[test]
+    fn notes_are_created_edited_listed_oldest_first_and_deleted() {
+        let conn = db();
+        let mut s = session("s1", "r1", 1);
+        s.head_sha = Some("h".repeat(40));
+        insert_session(&conn, &s, None).unwrap();
+        insert_session(&conn, &session("s2", "r1", 2), None).unwrap();
+
+        let line = NoteAnchor::Line {
+            file: "orders/policy.txt".into(),
+            line: 12,
+            side: DiffSide::New,
+        };
+        let a = save_note(&conn, "s1", None, "  Check the boundary.\n", Some(&line)).unwrap();
+        assert_eq!(a.body, "Check the boundary.");
+        assert_eq!(a.session_id, "s1");
+        assert_eq!(a.anchor.as_ref(), Some(&line));
+        assert_eq!(a.head_sha, "h".repeat(40));
+        assert_eq!(a.created_at, a.updated_at);
+        assert!(chrono::DateTime::parse_from_rfc3339(&a.created_at).is_ok());
+
+        let block = NoteAnchor::Block {
+            entry_point_id: "ep1".into(),
+            block_id: "b3".into(),
+            label: "save_order".into(),
+        };
+        let b = save_note(&conn, "s1", None, "Whole-review thought", None).unwrap();
+        let c = save_note(&conn, "s1", None, "On a block", Some(&block)).unwrap();
+        assert_eq!(b.anchor, None);
+        assert_ne!(a.id, b.id);
+        // A session that isn't prepared yet has no head to pin the note to.
+        let other = save_note(&conn, "s2", None, "elsewhere", None).unwrap();
+        assert_eq!(other.head_sha, "");
+
+        let ids = |sid: &str| -> Vec<String> {
+            list_notes(&conn, sid)
+                .unwrap()
+                .into_iter()
+                .map(|n| n.id)
+                .collect()
+        };
+        assert_eq!(ids("s1"), vec![a.id.clone(), b.id.clone(), c.id.clone()]);
+        assert_eq!(ids("s2"), vec![other.id.clone()]);
+        assert_eq!(list_notes(&conn, "s1").unwrap()[2].anchor, Some(block));
+
+        // Editing changes the body only, and keeps the note's place in the list.
+        conn.execute(
+            "UPDATE notes SET updated_at = '2020-01-01T00:00:00.000Z' WHERE id = ?1",
+            [&a.id],
+        )
+        .unwrap();
+        let edited = save_note(&conn, "s1", Some(&a.id), " Boundary is exclusive. ", None).unwrap();
+        assert_eq!(edited.id, a.id);
+        assert_eq!(edited.body, "Boundary is exclusive.");
+        assert_eq!(
+            edited.anchor.as_ref(),
+            Some(&line),
+            "the anchor survives an edit"
+        );
+        assert_eq!(edited.created_at, a.created_at);
+        assert!(edited.updated_at.as_str() > "2020-01-01T00:00:00.000Z");
+        assert_eq!(ids("s1"), vec![a.id.clone(), b.id.clone(), c.id.clone()]);
+
+        // Empty bodies, unknown notes, other sessions' notes, unknown sessions.
+        for blank in ["", "   ", "\n\t"] {
+            assert!(save_note(&conn, "s1", None, blank, None)
+                .unwrap_err()
+                .contains("can't be empty"));
+            assert!(save_note(&conn, "s1", Some(&a.id), blank, None).is_err());
+        }
+        assert_eq!(
+            get_note(&conn, &a.id).unwrap().unwrap().body,
+            "Boundary is exclusive."
+        );
+        assert!(save_note(&conn, "s1", Some("nope"), "x", None)
+            .unwrap_err()
+            .contains("no longer exists"));
+        assert!(save_note(&conn, "s2", Some(&a.id), "hijack", None).is_err());
+        assert!(save_note(&conn, "missing", None, "x", None)
+            .unwrap_err()
+            .contains("session no longer exists"));
+
+        delete_note(&conn, &b.id).unwrap();
+        assert_eq!(ids("s1"), vec![a.id.clone(), c.id.clone()]);
+        assert_eq!(get_note(&conn, &b.id).unwrap(), None);
+        // Deleting again is quiet, and other sessions' notes are untouched.
+        delete_note(&conn, &b.id).unwrap();
+        assert_eq!(ids("s2"), vec![other.id]);
     }
 
     fn analysis(session: &str, kind: &str, sha: &str, marker: &str) -> Analysis {

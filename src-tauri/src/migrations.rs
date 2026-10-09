@@ -4,10 +4,11 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 // -- NEVER MAKE A CHANGE TO A PREVIOUS MIGRATION!!!
 
 pub fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "create initial tables",
-        sql: r#"
+    vec![
+        Migration {
+            version: 1,
+            description: "create initial tables",
+            sql: r#"
             CREATE TABLE IF NOT EXISTS app_metadata (
                 key TEXT PRIMARY KEY NOT NULL,
                 value TEXT NOT NULL
@@ -121,6 +122,38 @@ pub fn migrations() -> Vec<Migration> {
             CREATE INDEX IF NOT EXISTS idx_ask_session ON ask_messages(session_id);
             CREATE INDEX IF NOT EXISTS idx_findings_session ON findings(session_id);
         "#,
-        kind: MigrationKind::Up,
-    }]
+            kind: MigrationKind::Up,
+        },
+        // Every migration must be safe to run twice (`IF NOT EXISTS` only, no
+        // `ALTER TABLE`): `db::open` applies them from Rust when the engine
+        // touches the database before the webview has run the plugin's migrator,
+        // and the plugin then runs them again.
+        Migration {
+            version: 2,
+            description: "notes and commit review sources",
+            sql: r#"
+            CREATE TABLE IF NOT EXISTS notes (
+                id TEXT PRIMARY KEY NOT NULL,
+                session_id TEXT NOT NULL REFERENCES review_sessions(id),
+                body TEXT NOT NULL,
+                anchor_json TEXT,
+                head_sha TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS session_commits (
+                session_id TEXT PRIMARY KEY NOT NULL REFERENCES review_sessions(id),
+                branch TEXT,
+                base_sha TEXT NOT NULL,
+                head_sha TEXT NOT NULL,
+                commit_count INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_notes_session ON notes(session_id);
+            CREATE INDEX IF NOT EXISTS idx_session_commits_head ON session_commits(head_sha);
+        "#,
+            kind: MigrationKind::Up,
+        },
+    ]
 }

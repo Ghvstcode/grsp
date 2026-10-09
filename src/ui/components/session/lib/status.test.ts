@@ -18,6 +18,7 @@ import {
     refLabel,
     repoSlugOf,
     sectionState,
+    sourceWording,
     traceLine,
 } from "./status";
 
@@ -170,5 +171,47 @@ describe("session helpers", () => {
         expect(isFromEarlierVersion(HEAD_SHA, primary)).toBe(false);
         expect(isFromEarlierVersion("abc", primary)).toBe(true);
         expect(isFromEarlierVersion("", primary)).toBe(false);
+    });
+});
+
+describe("sourceWording", () => {
+    const [pr] = seedSessions();
+    const commits = (count: number) =>
+        sourceWording({
+            ...pr,
+            source: {
+                kind: "commits",
+                base: "a40f7d2",
+                head: HEAD_SHA,
+                count,
+            },
+        });
+
+    it("keeps the pull request wording, with discussion and posting", () => {
+        const wording = sourceWording(pr);
+        expect(wording.authorLabel).toBe("Author says");
+        expect(wording.noDiscussion).toBeUndefined();
+        expect(wording.noPosting).toBeUndefined();
+    });
+
+    it("explains what a branch comparison can't do", () => {
+        const wording = sourceWording({
+            ...pr,
+            source: { kind: "branches", base: "main", head: "feat/x" },
+        });
+        expect(wording.authorLabel).toBe("Author says");
+        expect(wording.noDiscussion).toMatch(/branch comparison/);
+        expect(wording.noPosting).toMatch(/branch comparison/);
+    });
+
+    it("talks about the commit message, singular or plural", () => {
+        expect(commits(1).authorLabel).toBe("Commit message");
+        expect(commits(1).preparing).toBe("Getting this commit ready");
+        expect(commits(1).noDiscussion).toMatch(/for a commit\./);
+        expect(commits(1).noPosting).toMatch(/for a commit:/);
+        expect(commits(4).authorLabel).toBe("Commit messages");
+        expect(commits(4).preparing).toBe("Getting these commits ready");
+        expect(commits(4).noDiscussion).toMatch(/for commits\./);
+        expect(commits(4).reviewIntro).toMatch(/these commits/);
     });
 });

@@ -134,6 +134,17 @@ pub async fn repo_list_branches(
     .await
 }
 
+#[tauri::command]
+pub async fn repo_list_commits(
+    state: State<'_, AppState>,
+    repo_id: String,
+    branch: String,
+    limit: Option<u32>,
+) -> Result<CommitList, String> {
+    let engine = state.engine.clone();
+    blocking(move || engine.list_commits(&repo_id, &branch, limit)).await
+}
+
 /// Clone `owner/name` from GitHub into grsp's own folder so a pasted PR link
 /// works without the user finding a local clone first. Reuses an earlier
 /// clone if one is already there.
@@ -338,6 +349,45 @@ pub async fn excerpt_read(
 ) -> Result<Excerpt, String> {
     let engine = state.engine.clone();
     blocking(move || engine.read_excerpt(&session_id, &file, start_line, end_line)).await
+}
+
+#[tauri::command]
+pub async fn diff_read(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<SessionDiff, String> {
+    let engine = state.engine.clone();
+    blocking(move || engine.read_diff(&session_id)).await
+}
+
+// ── Notes ──────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_list(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<Vec<Note>, String> {
+    let engine = state.engine.clone();
+    blocking(move || engine.list_notes(&session_id)).await
+}
+
+/// Creates a note, or updates the body of note `id`.
+#[tauri::command]
+pub async fn note_save(
+    state: State<'_, AppState>,
+    session_id: String,
+    id: Option<String>,
+    body: String,
+    anchor: Option<NoteAnchor>,
+) -> Result<Note, String> {
+    let engine = state.engine.clone();
+    blocking(move || engine.save_note(&session_id, id.as_deref(), &body, anchor.as_ref())).await
+}
+
+#[tauri::command]
+pub async fn note_delete(state: State<'_, AppState>, note_id: String) -> Result<(), String> {
+    let engine = state.engine.clone();
+    blocking(move || engine.delete_note(&note_id)).await
 }
 
 #[tauri::command]

@@ -2,9 +2,9 @@
 
 use super::{
     git_cmd, run_git, DiffBundle, GitResult, RawFileDiff, Shard, LARGE_PR_FILES, LARGE_PR_LINES,
-    RAW_DIFF_MAX_LINES,
+    PATCH_MAX_LINES, RAW_DIFF_MAX_LINES,
 };
-use crate::model::{DiffFile, DiffMap, DiffStats, FileStatus, Hunk};
+use crate::model::{DiffFile, DiffFilePatch, DiffMap, DiffStats, FileStatus, Hunk, SessionDiff};
 use std::collections::{BTreeMap, HashSet};
 use std::io::Write;
 use std::path::Path;
@@ -489,15 +489,20 @@ pub fn bundle_from_diff_text(
     bundle
 }
 
-/// Build the DiffMap from `git diff --find-renames merge_base..head`, run in
-/// `worktree` (the session worktree at head, so `.gitattributes` and
-/// `.grsp/config.toml` are read at head). Applies all exclusions.
-pub fn build_diff(worktree: &Path, merge_base_sha: &str, head_sha: &str) -> GitResult<DiffBundle> {
-    if merge_base_sha.starts_with('-') || head_sha.starts_with('-') {
+/// `git diff --find-renames` from the merge base to the head, as text.
+///
+/// The two revisions are passed separately, which for `git diff` means the
+/// same as `a..b` but also accepts a tree on the left: a root commit is
+/// diffed against git's empty tree.
+fn read_diff_text(worktree: &Path, merge_base_sha: &str, head_sha: &str) -> GitResult<String> {
+    if merge_base_sha.is_empty()
+        || head_sha.is_empty()
+        || merge_base_sha.starts_with('-')
+        || head_sha.starts_with('-')
+    {
         return Err("Not a valid revision.".to_string());
     }
-    let range = format!("{merge_base_sha}..{head_sha}");
-    let text = run_git(
+    run_git(
         worktree,
         &[
             "-c",
@@ -510,18 +515,133 @@ pub fn build_diff(worktree: &Path, merge_base_sha: &str, head_sha: &str) -> GitR
             "--unified=3",
             "--src-prefix=a/",
             "--dst-prefix=b/",
-            &range,
+            merge_base_sha,
+            head_sha,
             "--",
         ],
     )
-    .map_err(|e| format!("Couldn't read the diff: {e}"))?;
-    let paths: Vec<String> = parse_unified_diff(&text)
+    .map_err(|e| format!("Couldn't read the diff: {e}"))
+}
+
+/// The exclusions that need the worktree: user globs and `.gitattributes`.
+fn worktree_exclusions(worktree: &Path, diff_text: &str) -> (Vec<String>, HashSet<String>) {
+    let paths: Vec<String> = parse_unified_diff(diff_text)
         .into_iter()
         .map(|(f, _)| f.path)
         .collect();
-    let attr_excluded = linguist_excluded(worktree, &paths);
-    let globs = read_user_excludes(worktree);
+    (
+        read_user_excludes(worktree),
+        linguist_excluded(worktree, &paths),
+    )
+}
+
+/// Build the DiffMap from `git diff --find-renames merge_base..head`, run in
+/// `worktree` (the session worktree at head, so `.gitattributes` and
+/// `.grsp/config.toml` are read at head). Applies all exclusions.
+pub fn build_diff(worktree: &Path, merge_base_sha: &str, head_sha: &str) -> GitResult<DiffBundle> {
+    let text = read_diff_text(worktree, merge_base_sha, head_sha)?;
+    let (globs, attr_excluded) = worktree_exclusions(worktree, &text);
     Ok(bundle_from_diff_text(&text, &globs, &attr_excluded))
+}
+
+// ── Whole-diff patches (Code tab) ──────────────────────────
+
+/// Index of each hunk header line in one file's raw diff. Counts hunk
+/// bodies the way `parse_unified_diff` does, so a body line that looks like
+/// a header isn't mistaken for one.
+fn hunk_header_lines(raw: &str) -> Vec<usize> {
+    let mut starts = Vec::new();
+    let (mut old_left, mut new_left) = (0u32, 0u32);
+    for (i, line) in raw.lines().enumerate() {
+        if old_left > 0 || new_left > 0 {
+            match line.as_bytes().first() {
+                Some(b'+') => new_left = new_left.saturating_sub(1),
+                Some(b'-') => old_left = old_left.saturating_sub(1),
+                Some(b'\\') => {}
+                _ => {
+                    old_left = old_left.saturating_sub(1);
+                    new_left = new_left.saturating_sub(1);
+                }
+            }
+        } else if let Some(h) = parse_hunk_header(line) {
+            old_left = h.old_lines;
+            new_left = h.new_lines;
+            starts.push(i);
+        }
+    }
+    starts
+}
+
+/// Cut a file's patch to at most `max_lines` lines. The cut falls between
+/// two hunks when a whole hunk fits, so what remains is still a valid
+/// patch; a single hunk longer than the cap is cut inside.
+fn cap_patch(raw: &str, max_lines: usize) -> (String, bool) {
+    if raw.lines().count() <= max_lines {
+        return (raw.to_string(), false);
+    }
+    let starts = hunk_header_lines(raw);
+    let keep = starts
+        .iter()
+        .copied()
+        .rfind(|&i| i <= max_lines && starts.first() != Some(&i))
+        .unwrap_or(max_lines);
+    let mut out = raw.lines().take(keep).collect::<Vec<_>>().join("\n");
+    out.push('\n');
+    (out, true)
+}
+
+/// Pure half of `build_session_diff`: split diff text into per-file patches
+/// with the same exclusions as `bundle_from_diff_text`.
+pub fn session_diff_from_text(
+    diff_text: &str,
+    user_globs: &[String],
+    attr_excluded: &HashSet<String>,
+    max_lines: usize,
+) -> SessionDiff {
+    let mut out = SessionDiff::default();
+    for (file, raw) in parse_unified_diff(diff_text) {
+        if file.path.is_empty() {
+            continue;
+        }
+        if attr_excluded.contains(&file.path) || is_excluded_path(&file.path, user_globs) {
+            out.excluded_files += 1;
+            continue;
+        }
+        let (patch, truncated) = if file.binary {
+            (String::new(), false)
+        } else {
+            cap_patch(&raw, max_lines)
+        };
+        out.files.push(DiffFilePatch {
+            added: file.added_lines.len() as u32,
+            removed: file.removed_lines.len() as u32,
+            path: file.path,
+            old_path: file.old_path,
+            status: file.status,
+            binary: file.binary,
+            patch,
+            truncated,
+        });
+    }
+    out
+}
+
+/// A session's whole diff, file by file, for the Code tab. Same command and
+/// exclusions as `build_diff`; each file's patch is capped at
+/// `PATCH_MAX_LINES`.
+pub fn build_session_diff(
+    worktree: &Path,
+    merge_base_sha: &str,
+    head_sha: &str,
+) -> GitResult<SessionDiff> {
+    let text = read_diff_text(worktree, merge_base_sha, head_sha)?;
+    let (globs, attr_excluded) = worktree_exclusions(worktree, &text);
+    Ok(session_diff_from_text(
+        &text,
+        &globs,
+        &attr_excluded,
+        PATCH_MAX_LINES,
+    ))
 }
 
 /// Totals over a DiffMap.
@@ -1152,6 +1272,148 @@ index 1..2 100644
         );
     }
 
+    // ── Whole-diff patches ─────────────────────────────────
+
+    #[test]
+    fn session_diff_splits_per_file_and_honours_exclusions() {
+        let text = format!("{MODIFIED}{RENAMED_BINARY_LOCK}");
+        let attr: HashSet<String> = ["gen/api.txt".to_string()].into();
+        let d = session_diff_from_text(&text, &["*.snap".to_string()], &attr, 3000);
+        let paths: Vec<&str> = d.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            ["orders/services.py", "orders/constants.py", "logo.png"]
+        );
+        // package-lock.json (convention), a.snap (user glob), gen/api.txt (attribute).
+        assert_eq!(d.excluded_files, 3);
+
+        let svc = &d.files[0];
+        assert_eq!(svc.status, FileStatus::Modified);
+        assert!(svc
+            .patch
+            .starts_with("diff --git a/orders/services.py b/orders/services.py\n"));
+        assert!(svc.patch.ends_with('\n'));
+        assert!(!svc.patch.contains("orders/constants.py"));
+        assert!(!svc.truncated && !svc.binary);
+        assert_eq!(
+            svc.added as usize,
+            svc.patch
+                .lines()
+                .filter(|l| l.starts_with('+') && !l.starts_with("+++"))
+                .count()
+        );
+
+        let renamed = &d.files[1];
+        assert_eq!(renamed.status, FileStatus::Renamed);
+        assert_eq!(renamed.old_path.as_deref(), Some("orders/names.py"));
+        assert!(renamed.patch.contains("rename from orders/names.py"));
+        assert_eq!((renamed.added, renamed.removed), (1, 1));
+
+        let logo = &d.files[2];
+        assert!(logo.binary);
+        assert_eq!(logo.patch, "");
+        assert!(!logo.truncated);
+        assert_eq!((logo.added, logo.removed), (0, 0));
+
+        assert_eq!(
+            session_diff_from_text("", &[], &HashSet::new(), 10),
+            SessionDiff::default()
+        );
+    }
+
+    const RENAMED_BINARY_LOCK: &str = "\
+diff --git a/orders/names.py b/orders/constants.py
+similarity index 80%
+rename from orders/names.py
+rename to orders/constants.py
+index 1111111..2222222 100644
+--- a/orders/names.py
++++ b/orders/constants.py
+@@ -1,3 +1,3 @@
+ A = 1
+-B = 2
++B = 3
+ C = 3
+diff --git a/logo.png b/logo.png
+index 1111111..2222222 100644
+Binary files a/logo.png and b/logo.png differ
+diff --git a/package-lock.json b/package-lock.json
+index 1111111..2222222 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1 +1 @@
+-{}
++{\"a\": 1}
+diff --git a/snap/a.snap b/snap/a.snap
+index 1111111..2222222 100644
+--- a/snap/a.snap
++++ b/snap/a.snap
+@@ -1 +1 @@
+-one
++two
+diff --git a/gen/api.txt b/gen/api.txt
+index 1111111..2222222 100644
+--- a/gen/api.txt
++++ b/gen/api.txt
+@@ -1 +1 @@
+-one
++two
+";
+
+    /// A file whose diff is `hunks` hunks of `per_hunk` added lines each.
+    fn many_hunks(hunks: usize, per_hunk: usize) -> String {
+        let mut text = String::from(
+            "diff --git a/big.txt b/big.txt\nindex 1111111..2222222 100644\n--- a/big.txt\n+++ b/big.txt\n",
+        );
+        for h in 0..hunks {
+            let start = h * 1000 + 1;
+            text.push_str(&format!("@@ -{start},0 +{start},{per_hunk} @@\n"));
+            for n in 0..per_hunk {
+                // Body lines that look like headers must not confuse the cut.
+                text.push_str(if n == 1 {
+                    "+@@ -1,2 +1,2 @@\n"
+                } else {
+                    "+line\n"
+                });
+            }
+        }
+        text
+    }
+
+    #[test]
+    fn a_very_large_patch_is_cut_between_hunks_and_marked_truncated() {
+        // 4 header lines + 3 hunks of (1 + 40) lines = 127 lines.
+        let text = many_hunks(3, 40);
+        let d = session_diff_from_text(&text, &[], &HashSet::new(), 100);
+        let f = &d.files[0];
+        assert!(f.truncated);
+        // Two whole hunks fit in 100 lines; the third is left out entirely.
+        assert_eq!(f.patch.lines().count(), 4 + 2 * 41);
+        assert_eq!(f.patch.lines().filter(|l| l.starts_with("@@ ")).count(), 2);
+        assert!(f.patch.ends_with('\n'));
+        // The totals still describe the whole file.
+        assert_eq!(f.added, 120);
+
+        // Under the cap nothing is cut.
+        let whole = session_diff_from_text(&text, &[], &HashSet::new(), 127);
+        assert!(!whole.files[0].truncated);
+        assert_eq!(whole.files[0].patch, text);
+
+        // A single hunk longer than the cap is cut inside it.
+        let one = session_diff_from_text(&many_hunks(1, 500), &[], &HashSet::new(), 100);
+        assert!(one.files[0].truncated);
+        assert_eq!(one.files[0].patch.lines().count(), 100);
+        assert_eq!(one.files[0].added, 500);
+    }
+
+    #[test]
+    fn the_default_cap_is_three_thousand_lines() {
+        let d =
+            session_diff_from_text(&many_hunks(1, 3_500), &[], &HashSet::new(), PATCH_MAX_LINES);
+        assert!(d.files[0].truncated);
+        assert_eq!(d.files[0].patch.lines().count(), 3_000);
+    }
+
     // ── Real git ───────────────────────────────────────────
 
     #[test]
@@ -1262,5 +1524,32 @@ index 1..2 100644
             .any(|r| r.path == "orders/services.py"
                 && r.text.contains("+    if order.total > LIMIT:")));
         assert!(build_diff(dir, "--output=/tmp/x", &head).is_err());
+
+        // The Code tab's diff: the same files, the same exclusions.
+        let diff = build_session_diff(dir, &mb, &head).unwrap();
+        let patch_paths: Vec<&str> = diff.files.iter().map(|f| f.path.as_str()).collect();
+        let map_paths: Vec<&str> = bundle.map.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(patch_paths, map_paths);
+        assert_eq!(diff.excluded_files as usize, bundle.excluded.len());
+        assert_eq!(diff.excluded_files, 4);
+        let patch = |path: &str| diff.files.iter().find(|f| f.path == path).unwrap();
+        let svc = patch("orders/services.py");
+        assert!(svc
+            .patch
+            .starts_with("diff --git a/orders/services.py b/orders/services.py\n"));
+        assert!(svc.patch.contains("+    if order.total > LIMIT:"));
+        assert_eq!((svc.added, svc.removed), (2, 0));
+        assert!(!svc.truncated);
+        let renamed = patch("orders/constants.py");
+        assert_eq!(renamed.status, FileStatus::Renamed);
+        assert_eq!(renamed.old_path.as_deref(), Some("orders/names.py"));
+        assert!(renamed.patch.contains("rename to orders/constants.py"));
+        let logo = patch("logo.png");
+        assert!(logo.binary);
+        assert_eq!(logo.patch, "");
+        assert_eq!(patch("orders/legacy.py").status, FileStatus::Deleted);
+        assert_eq!(patch("orders/legacy.py").removed, 2);
+        assert!(build_session_diff(dir, "--output=/tmp/x", &head).is_err());
+        assert!(build_session_diff(dir, "", &head).is_err());
     }
 }

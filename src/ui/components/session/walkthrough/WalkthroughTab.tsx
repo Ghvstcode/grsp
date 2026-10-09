@@ -3,9 +3,12 @@ import type {
     Analysis,
     CodeRef,
     GrspSettings,
+    Note,
     ReviewSession,
     WalkthroughResult,
 } from "@core/types/grsp";
+import type { NotesController } from "@core/api/useNotes";
+import { isTinyCommitSession } from "@core/utils/commits";
 import {
     useCancelAnalysis,
     useExcerpt,
@@ -20,12 +23,15 @@ import {
     SectionError,
     SkeletonLine,
 } from "../shared/AnalysisSection";
+import { NoteCard } from "../notes/NoteCard";
+import { NoteEditor } from "../notes/NoteEditor";
 import { ChangeChip } from "../shared/ChangeChip";
 import { CodeBlock } from "../shared/CodeBlock";
 import { InlineText } from "../shared/InlineText";
 import { ProgressLine } from "../shared/ProgressLine";
 import { SectionLabel } from "../shared/SectionLabel";
 import { kindLabel, refLabel, sectionState } from "../lib/status";
+import { plural } from "../lib/text";
 import {
     clampStep,
     defaultOptionIndex,
@@ -181,6 +187,17 @@ interface BlockDetailProps {
     showCode: boolean;
     onStep: (index: number) => void;
     onToggleCode: () => void;
+    notes: NotesController;
+}
+
+/** The notes pinned to one block of one entry point's walkthrough. */
+function blockNotes(notes: Note[], entryPointId: string, blockId: string) {
+    return notes.filter(
+        (note) =>
+            note.anchor?.kind === "block" &&
+            note.anchor.entryPointId === entryPointId &&
+            note.anchor.blockId === blockId,
+    );
 }
 
 /** Right column: what happens at the current block. */
@@ -194,9 +211,16 @@ function BlockDetail({
     showCode,
     onStep,
     onToggleCode,
+    notes,
 }: BlockDetailProps) {
     const step = steps[current];
     const { block } = step;
+    // Which block the note box is open on, so stepping away closes it.
+    const [notingBlock, setNotingBlock] = useState<string | undefined>(
+        undefined,
+    );
+    const noting = notingBlock === block.id;
+    const pinned = blockNotes(notes.notes, result.entryPointId, block.id);
     const option = selectedOption(result, optionIndex);
     const taken = takenBranch(block, option);
     const branch = (on: boolean) =>
@@ -269,11 +293,61 @@ function BlockDetail({
                 <Button
                     variant="outline"
                     className={cn(outlineButton, "ml-auto")}
+                    aria-expanded={noting}
+                    onClick={() =>
+                        setNotingBlock(noting ? undefined : block.id)
+                    }
+                >
+                    Add note
+                </Button>
+                <Button
+                    variant="outline"
+                    className={outlineButton}
                     onClick={onToggleCode}
                 >
                     {showCode ? "Hide code" : "Show code"}
                 </Button>
             </div>
+
+            {(noting || pinned.length > 0) && (
+                <div className="flex flex-col gap-3">
+                    <SectionLabel>Your notes on this step</SectionLabel>
+                    {pinned.map((note) => (
+                        <NoteCard
+                            key={note.id}
+                            note={note}
+                            showAnchor={false}
+                            onEdit={(body) =>
+                                notes.save.mutate({ id: note.id, body })
+                            }
+                            onDelete={() => notes.remove.mutate(note.id)}
+                        />
+                    ))}
+                    {noting && (
+                        <NoteEditor
+                            label={`Note on ${block.label}`}
+                            placeholder="A private note on this step. Markdown works."
+                            submitLabel="Add note"
+                            autoFocus
+                            rows={2}
+                            className="max-w-[680px]"
+                            onSave={(body) => {
+                                notes.save.mutate({
+                                    body,
+                                    anchor: {
+                                        kind: "block",
+                                        entryPointId: result.entryPointId,
+                                        blockId: block.id,
+                                        label: block.label,
+                                    },
+                                });
+                                setNotingBlock(undefined);
+                            }}
+                            onCancel={() => setNotingBlock(undefined)}
+                        />
+                    )}
+                </div>
+            )}
         </div>
     );
 }
@@ -304,7 +378,10 @@ interface PathViewProps {
     showUnchanged: boolean;
     /** Refs to land on, from "Walk through it". */
     jumpRefs: CodeRef[] | undefined;
+    /** A block to land on, from a note pinned to it. */
+    jumpBlockId: string | undefined;
     walk: WalkController;
+    notes: NotesController;
 }
 
 function PathView({
@@ -313,9 +390,11 @@ function PathView({
     optionIndex,
     showUnchanged,
     jumpRefs,
+    jumpBlockId,
     walk,
+    notes,
 }: PathViewProps) {
-    const { state, setStep, toggleCode } = walk;
+    const { state, setStep, setOption, toggleCode } = walk;
     const steps = routeSteps(result, optionIndex, showUnchanged);
     const current = clampStep(state.step, steps.length);
 
@@ -325,6 +404,28 @@ function PathView({
         // Runs once per jump, when this path first renders for it.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [jumpRefs]);
+
+    // A note's anchor lands on its block, switching "what if" input when
+    // the block is only on another input's path.
+    useEffect(() => {
+        if (!jumpBlockId) return;
+        const index = steps.findIndex((s) => s.block.id === jumpBlockId);
+        if (index >= 0) {
+            setStep(index);
+            return;
+        }
+        const other =
+            result.whatIf?.options.findIndex((o) =>
+                o.path.includes(jumpBlockId),
+            ) ?? -1;
+        if (other >= 0 && other !== optionIndex) {
+            setOption(result.entryPointId, other);
+        } else {
+            setStep(0);
+        }
+        // Runs per jump, and again once the input has been switched.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [jumpBlockId, optionIndex]);
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -362,6 +463,7 @@ function PathView({
                 showCode={state.showCode}
                 onStep={setStep}
                 onToggleCode={toggleCode}
+                notes={notes}
             />
         </div>
     );
@@ -372,6 +474,33 @@ interface WalkthroughTabProps {
     analyses: SessionAnalyses | undefined;
     settings: GrspSettings;
     walk: WalkController;
+    notes: NotesController;
+    onOpenCode: () => void;
+}
+
+/** A commit so small that its diff may say everything. Never blocks. */
+function TinyHint({
+    session,
+    onOpenCode,
+}: {
+    session: ReviewSession;
+    onOpenCode: () => void;
+}) {
+    if (!isTinyCommitSession(session)) return null;
+    const lines = session.linesAdded + session.linesRemoved;
+    return (
+        <p className="m-0 text-[13px] text-muted-foreground">
+            This is a small change ({plural(lines, "line")}).{" "}
+            <button
+                type="button"
+                onClick={onOpenCode}
+                className="font-medium text-foreground underline underline-offset-[3px]"
+            >
+                The Code tab
+            </button>{" "}
+            may be all you need.
+        </p>
+    );
 }
 
 /** A debugger for behaviour: pick an entry point and step through its path. */
@@ -380,6 +509,8 @@ export function WalkthroughTab({
     analyses,
     settings,
     walk,
+    notes,
+    onOpenCode,
 }: WalkthroughTabProps) {
     const run = useRunAnalysis(session.id);
     const cancel = useCancelAnalysis(session.id);
@@ -423,6 +554,7 @@ export function WalkthroughTab({
         return (
             <section className="min-w-0 grow overflow-auto">
                 <div className="flex flex-col gap-[22px] px-9 pb-12 pt-6">
+                    <TinyHint session={session} onOpenCode={onOpenCode} />
                     {discoveryState === "error" ? (
                         <SectionError
                             title="Walkthroughs need the entry points, and finding them failed."
@@ -449,6 +581,7 @@ export function WalkthroughTab({
     return (
         <section className="min-w-0 grow overflow-auto">
             <div className="flex flex-col gap-[22px] px-9 pb-12 pt-6">
+                <TinyHint session={session} onOpenCode={onOpenCode} />
                 {!entry ? (
                     <div className="grsp-border-strong rounded-[10px] border border-dashed px-[18px] py-3.5 text-[13px] text-muted-foreground">
                         There's nothing to walk through: the agent found no
@@ -545,7 +678,14 @@ export function WalkthroughTab({
                                             ? jump.refs
                                             : undefined
                                     }
+                                    jumpBlockId={
+                                        walk.state.jumpBlock?.entryId ===
+                                        entry.id
+                                            ? walk.state.jumpBlock.blockId
+                                            : undefined
+                                    }
                                     walk={walk}
+                                    notes={notes}
                                 />
                             )}
                         </AnalysisSection>
