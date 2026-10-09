@@ -63,6 +63,10 @@ Run an AI review with your own prompt. Edit the findings, choose which to includ
   <img src=".github/assets/review.png" alt="The Review tab: three findings, one blocking, each with a code excerpt and an editable comment" width="880" />
 </p>
 
+### Code and notes
+
+The Code tab shows the whole diff, file by file, in split or unified view. Pin private notes to a line or a walkthrough step and export them as Markdown.
+
 <sub>Screenshots are the app running on its built-in fixture scenario. You can open the same screens yourself with <a href="#build-from-source">fixture mode</a>.</sub>
 
 ## How it works
@@ -71,7 +75,7 @@ Run an AI review with your own prompt. Edit the findings, choose which to includ
   <img src=".github/assets/how-it-works.png" alt="Point it at a PR, your agent explores read-only, grsp verifies every claim against git, then you understand and review" width="880" />
 </p>
 
-1. **Point it at a PR.** Paste a GitHub PR link, pick from a repo's open PRs, or choose two branches. If you don't have the repo locally, grsp offers to clone it.
+1. **Point it at a change.** Paste a GitHub PR link, pick from a repo's open PRs, choose two branches, or pick commits on a branch: one commit, or everything since you last looked. If you don't have the repo locally, grsp offers to clone it.
 2. **Your agent explores.** grsp fetches the refs, checks out a detached worktree at the PR head and runs Claude Code or Codex against it in read-only mode.
 3. **grsp verifies.** Every `file:line` the agent returns is matched against the worktree. A reference that is a few lines off is snapped to the right line; one that can't be found is dropped.
 4. **You read the result.** Each section appears as soon as it is ready, and tells you how much was explored, verified and left unverified.

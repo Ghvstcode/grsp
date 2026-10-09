@@ -16,6 +16,21 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
     {
+        version: "0.2.0",
+        date: "Oct 9th, 2026",
+        title: "Review commits, read the code, keep notes",
+        description:
+            "grsp no longer needs a pull request. Point it at a commit, or at everything pushed to a branch since you last looked.",
+        features: [
+            "Commits — a fourth way to start a review. Pick a branch and review one commit, a commit and everything newer, or everything since you last looked. The commit message stands in for the PR description",
+            "Code tab — the whole diff, file by file, in split or unified view. File references elsewhere in the app jump straight to the line",
+            "Notes — private notes on a review, on a line of code or on a walkthrough step, with copy and export as Markdown",
+        ],
+        improvements: [
+            "Commit reviews link to the commit or comparison on GitHub when the repository has a GitHub remote",
+        ],
+    },
+    {
         version: "0.1.2",
         date: "Oct 8th, 2026",
         title: "Git LFS repositories, properly this time",
